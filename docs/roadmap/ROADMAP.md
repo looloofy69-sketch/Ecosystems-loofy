@@ -13,44 +13,49 @@ Completion means evidence is present in the repository, not that a status label 
 ## Phase 1 — Import and validate the decision module
 
 - [x] Import the v0.6.0 module source, tests, package metadata, examples, changelog, and architecture notes.
-- [x] Preserve the algorithm preconditions and documented mathematical limitations.
-- [x] Run the package tests and build a wheel in GitHub Actions.
-- [x] Add CI coverage for repository checks, package compilation, package tests, and wheel build.
+- [x] Preserve algorithm preconditions and mathematical limitations.
+- [x] Run package tests and build a wheel in GitHub Actions.
+- [x] Add CI coverage for repository checks, compilation, package tests, and wheel build.
 - [x] Integrate cooperative guards into workflow-task and portfolio-turn controller boundaries.
 
-Evidence: [successful GitHub Actions run 40130032418](https://github.com/looloofy69-sketch/Ecosystems-loofy/actions/runs/40130032418), checked at commit 9439c0ebcff2901a505adbdf0a6d0434b44c24ce.
+Evidence for that baseline: [CI run 40130032418](https://github.com/looloofy69-sketch/Ecosystems-loofy/actions/runs/40130032418).
 
-## Phase 2 — Unified run context and stronger runtime enforcement
+## Phase 2 — Shared run context and bounded execution
 
-- [ ] Introduce a typed RunContext carrying run ID, immutable policy snapshot, state version, budget ledger, deadline, cancellation, and trace lineage.
-- [ ] Propagate the shared context into capability handlers and any nested work.
-- [x] Bound planned task/turn counts and serialized input/output at controller boundaries.
-- [x] Test budget rejection, cancellation, and output-bound enforcement before accepting task output or portfolio state.
+- [x] Introduce typed RunContext with run ID, immutable policy snapshot, state version, budget ledger, deadline/cancellation, and trace lineage.
+- [x] Propagate context through workflow and portfolio controller boundaries, the capability registry, and supported algorithm loops.
+- [x] Enforce plan/task counts, cumulative task-input bytes, and accumulated output-size limits.
+- [x] Reject non-finite duration/resource policy values.
+- [x] Test budget rejection, cancellation inside algorithm/precondition loops, and output rejection before state commit.
 - [x] Document cooperative versus hard-timeout guarantees.
-- [ ] Decide and implement process isolation for blocking or untrusted capabilities where hard timeout guarantees are required.
+- [ ] Implement process isolation for blocking or untrusted capabilities where hard timeouts are required.
 - [ ] Add CPU/memory accounting where required; serialized byte limits are not resource quotas.
 
-## Phase 3 — State, checkpoint, and action boundary
+## Phase 3 — Workflow checkpoints and action boundary
 
-- [ ] Add versioned durable checkpoints and restart/recovery tests.
-- [ ] Separate candidate proposal, independent validation, authorization, and commit in typed APIs.
-- [ ] Add a deny-by-default authorization policy with authenticated identity for state-changing external operations.
-- [ ] Define idempotency/reconciliation for non-idempotent effects and make retries explicit.
-- [ ] Verify stale state cannot commit after the authoritative state version changes.
+- [x] Add append-only SQLite task checkpoints with sequence compare-and-swap.
+- [x] Bind checkpoints to a canonical workflow fingerprint and preserve completed outputs and budget state.
+- [x] Add restart recovery tests: reuse successes, retry only retry-safe capabilities, reject changed workflow definitions, and prevent retry of unsafe capabilities.
+- [x] Expose recovery via workflow CLI using the same workflow JSON and database with --resume RUN_ID.
+- [x] Fail closed on unknown side-effect classifications; require an approval declaration for write/external capabilities.
+- [ ] Add authenticated approval/authorization, RBAC, and an auditable policy decision record.
+- [ ] Bind state-changing commits to an authoritative state version using atomic compare-and-swap.
+- [ ] Add checkpoint/resume for adaptive portfolio turns.
+- [ ] Define idempotency/reconciliation for external operations; SQLite checkpoints do not provide exactly-once side effects.
 
-## Phase 4 — Adaptive policy and evidence
+## Phase 4 — Adaptive policy and evaluation evidence
 
-- [ ] Define and version state descriptors and capability precondition contracts.
-- [ ] Record policy reasons, scores, rejected alternatives, and switch rationale for every strategy choice.
-- [ ] Add validated candidate merge/deduplication with provenance.
+- [ ] Version state descriptors and mathematical capability preconditions.
+- [ ] Record policy reasons, score components, rejected alternatives, and switch rationale for each strategy choice.
+- [ ] Add validated candidate merging/deduplication with provenance.
 - [ ] Build reproducible evaluations for representative state families, failures, and edge cases.
-- [ ] Report quality, cost, starvation, and recovery metrics with methodology.
+- [ ] Report quality, cost, strategy starvation, and recovery metrics with methodology.
 
 ## Phase 5 — Hardening and release
 
 - [ ] Select and commit a license.
 - [ ] Establish a threat model, dependency/security review, operations runbook, telemetry-retention policy, compatibility policy, and rollback.
 - [ ] Define a bounded production use case and SLOs before production-readiness promotion.
-- [ ] Keep CI evidence tied to an exact commit and release artifact checksum.
+- [ ] Tie each release's tests, wheel, and checksums to an exact commit.
 
 Do not add algorithms just to increase count. Add a capability when its preconditions, measured benefit, validation, and safe fallback are defined.
