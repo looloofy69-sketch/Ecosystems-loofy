@@ -585,9 +585,9 @@ class TaskExecutionController:
                 if snapshot.get("workflow_fingerprint", workflow_fingerprint) != workflow_fingerprint:
                     raise WorkflowInputError("run_context policy snapshot has a different workflow fingerprint")
                 if not snapshot:
-                    run_context.policy_snapshot = {
+                    run_context.set_policy_snapshot({
                         "workflow_id": definition.workflow_id, "workflow_fingerprint": workflow_fingerprint,
-                    }
+                    })
             if self.run_store is not None and self.run_store.get_latest_checkpoint(run_context.run_id) is not None:
                 raise WorkflowInputError("run_context.run_id already has checkpoints; use resume_from_run_id instead")
             checkpoint_sequence = None
