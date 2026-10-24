@@ -110,7 +110,7 @@ def _register_explicit_optimization(registry: CapabilityRegistry) -> None:
 
     def run_local_search(payload, *, context: RunContext | None = None):
         ground, system = _explicit_system(payload)
-        system.verify_delta_matroid()
+        system.verify_delta_matroid(checkpoint=context.checkpoint if context is not None else None)
         weights = _normalise_weights(ground, payload["weights"])
         result = local_search(ground, weights, payload["initial"], system.member,
                               max_improving_moves=payload.get("max_improving_moves"),
@@ -158,7 +158,7 @@ def _register_path_capabilities(registry: CapabilityRegistry) -> None:
 
     def run_monotone_path(payload, *, context: RunContext | None = None):
         ground, system = _explicit_system(payload)
-        system.verify_even_delta_matroid()
+        system.verify_even_delta_matroid(checkpoint=context.checkpoint if context is not None else None)
         result = monotone_path(ground, payload["A"], payload["B"], system.member,
                                assume_even_delta_matroid=True,
                                checkpoint=context.checkpoint if context is not None else None)
