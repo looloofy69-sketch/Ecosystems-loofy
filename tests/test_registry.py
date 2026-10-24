@@ -19,13 +19,17 @@ class RegistryTests(unittest.TestCase):
         ids = [component["id"] for component in registry["components"]]
         self.assertEqual(len(ids), len(set(ids)))
 
-    def test_prototype_does_not_claim_repository_ci(self):
+    def test_imported_decision_module_has_ci_evidence_and_disclosed_limits(self):
         registry = json.loads((ROOT / "ecosystem/registry.json").read_text(encoding="utf-8"))
         component = next(c for c in registry["components"] if c["id"] == "delta-decision-infrastructure")
-        self.assertEqual(component["status"], "prototype-artifact")
-        self.assertEqual(component["validation"]["status"], "passed-locally")
-        self.assertIn("not this repository's CI", component["validation"]["scope"])
+        self.assertEqual(component["status"], "integrated")
+        self.assertEqual(component["version"], "0.6.0")
+        self.assertEqual(component["source"], "this-repository")
+        self.assertEqual(component["validation"]["status"], "ci-passed")
+        self.assertEqual(component["validation"]["tests"], 63)
+        self.assertIn("40130032418", component["validation"]["scope"])
         self.assertTrue(component["known_limitations"])
+        self.assertTrue(any("cannot forcibly interrupt" in item for item in component["known_limitations"]))
 
     def test_repository_validator_passes(self):
         result = subprocess.run(
