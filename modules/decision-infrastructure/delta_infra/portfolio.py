@@ -15,7 +15,7 @@ import time
 import uuid
 from typing import Any, Callable, Mapping, Sequence
 
-from .runtime import ExecutionBudget, ExecutionBudgetExceeded, ExecutionCancelled, RuntimeGuard
+from .runtime import ExecutionBudget, ExecutionBudgetExceeded, ExecutionCancelled, RunContext, RuntimeGuard
 
 PORTFOLIO_MODES = ("rotation", "alternation", "turn-taking", "shape-driven", "auto")
 TURN_STATUSES = ("progress", "no_change", "complete", "failed")
@@ -372,6 +372,7 @@ class PortfolioController:
         max_turns: int = 100,
         budget: ExecutionBudget | None = None,
         cancelled: Callable[[], bool] | None = None,
+        run_context: RunContext | None = None,
     ) -> dict[str, Any]:
         if mode not in PORTFOLIO_MODES:
             raise PortfolioDefinitionError(f"mode must be one of {PORTFOLIO_MODES}")
@@ -381,9 +382,19 @@ class PortfolioController:
             raise PortfolioDefinitionError("initial_state must be a mapping")
         original_state = _json_copy(dict(initial_state), label="initial_state")
         state = _json_copy(original_state, label="initial_state")
-        guard = RuntimeGuard(budget=budget or ExecutionBudget(), cancelled=cancelled or (lambda: False))
+        if run_context is not None and budget is not None and run_context.budget != budget:
+            raise PortfolioDefinitionError("budget must match the supplied run_context budget")
+        if run_context is None:
+            run_context = RunContext.create(
+                budget=budget or ExecutionBudget(), cancelled=cancelled,
+                policy_snapshot={"component": "portfolio", "mode": mode,
+                                 "portfolio_id": str(original_state.get("portfolio_id", "algorithm-portfolio"))},
+            )
+        elif cancelled is not None:
+            raise PortfolioDefinitionError("Pass cancellation through run_context or cancelled, not both")
+        guard = RuntimeGuard(context=run_context)
         guard.preflight(max_turns, {"mode": mode, "initial_state": original_state})
-        run_id = str(uuid.uuid4())
+        run_id = run_context.run_id
         started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
         start_clock = time.perf_counter()
         strategies = self.catalog.all()
@@ -502,8 +513,12 @@ class PortfolioController:
                 "strategy": chosen.name, "family": chosen.family, "decision": "execute",
             }
             try:
-                guard.checkpoint()
-                outcome = chosen.step(_json_copy(before, label="strategy input"))
+                guard.begin_task({"strategy": chosen.name, "state": before})
+                parameters = __import__("inspect").signature(chosen.step).parameters
+                if "context" in parameters:
+                    outcome = chosen.step(_json_copy(before, label="strategy input"), context=run_context)
+                else:
+                    outcome = chosen.step(_json_copy(before, label="strategy input"))
                 guard.checkpoint()
                 if not isinstance(outcome, StrategyTurn):
                     raise TransitionContractError(f"strategy {chosen.name!r} must return StrategyTurn")
@@ -587,6 +602,7 @@ class PortfolioController:
             "turn_count": len(turns), "strategy_run_counts": run_counts,
             "disabled_strategies": sorted(disabled), "initial_state": original_state,
             "final_state": state, "turns": turns, "outputs": {"final_state": state},
+            "run_context": run_context.checkpoint_metadata(),
         }
         if self.run_store is not None:
             self.run_store.save(record)
@@ -612,11 +628,11 @@ def capability_strategy(
     if not callable(payload_builder) or not callable(next_state_builder):
         raise PortfolioDefinitionError("capability strategy builders must be callable")
 
-    def step(state: Mapping[str, Any]) -> StrategyTurn:
+    def step(state: Mapping[str, Any], *, context: RunContext | None = None) -> StrategyTurn:
         payload = payload_builder(state)
         if not isinstance(payload, Mapping):
             raise PortfolioDefinitionError("payload_builder must return a mapping")
-        result = registry.run(capability_name, payload)
+        result = registry.run(capability_name, payload, context=context)
         next_state = next_state_builder(state, result)
         if not isinstance(next_state, Mapping):
             raise PortfolioDefinitionError("next_state_builder must return a mapping")
