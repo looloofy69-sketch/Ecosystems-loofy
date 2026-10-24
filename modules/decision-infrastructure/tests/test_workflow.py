@@ -161,18 +161,23 @@ class DurableCheckpointTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             store = WorkflowRunStore(Path(temp) / "runs.sqlite3")
             registry = default_registry()
+            calls = {"count": 0}
+            def unsafe(payload):
+                calls["count"] += 1
+                raise RuntimeError("failure after a possible external side effect")
             registry.register(Capability(
                 "test.unsafe", "1.0", "not marked retry-safe", (), (),
-                lambda payload: {"ok": True}, side_effect_class="external", retry_safe=False,
+                unsafe, side_effect_class="external", retry_safe=False,
             ))
             controller = TaskExecutionController(registry=registry, run_store=store)
             doc = {"workflow_id": "unsafe-resume-test", "tasks": [
                 {"id": "unsafe", "type": "capability", "capability": "test.unsafe", "inputs": {}},
             ]}
             first = controller.run(doc)
-            self.assertEqual(first["status"], "succeeded")
-            with self.assertRaisesRegex(WorkflowInputError, "successfully completed"):
+            self.assertEqual(first["status"], "failed")
+            with self.assertRaisesRegex(WorkflowInputError, "not declared retry-safe"):
                 controller.run(doc, resume_from_run_id=first["run_id"])
+            self.assertEqual(calls["count"], 1)
 
 
 if __name__=="__main__": unittest.main()
