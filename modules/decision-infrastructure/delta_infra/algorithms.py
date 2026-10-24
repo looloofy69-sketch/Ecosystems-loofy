@@ -356,7 +356,7 @@ def strong_path_explicit(
     original = ExplicitFamilyOracle(E, feasible_sets)
     if checkpoint is not None:
         checkpoint()
-    original.verify_delta_matroid()
+    original.verify_delta_matroid(checkpoint=checkpoint)
     A_set, B_set = frozenset(A), frozenset(B)
     if A_set not in original.feasible_sets or B_set not in original.feasible_sets:
         raise ValueError("Both endpoints must be feasible")
