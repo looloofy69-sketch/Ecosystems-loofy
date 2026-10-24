@@ -128,7 +128,10 @@ def _register_explicit_optimization(registry: CapabilityRegistry) -> None:
         ground, system = _explicit_system(payload)
         system.verify_delta_matroid()
         weights = _normalise_weights(ground, payload["weights"])
-        result = signed_greedy(ground, weights, system.separate, verify_result=True,
+        separator = lambda include, exclude: system.separate(
+            include, exclude, checkpoint=context.checkpoint if context is not None else None
+        )
+        result = signed_greedy(ground, weights, separator, verify_result=True,
                                checkpoint=context.checkpoint if context is not None else None)
         return {
             "solution": _ordered(result.solution, ground), "objective_value": result.objective_value,
