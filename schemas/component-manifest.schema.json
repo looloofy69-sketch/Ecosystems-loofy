@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ecosystems-loofy/component-manifest.schema.json",
+  "title": "Ecosystem Component Manifest",
+  "description": "Schema for a component in ecosystem/registry.json. Replace the placeholder $id only when a stable hosted schema URL exists.",
+  "type": "object",
+  "required": ["id", "name", "type", "status", "version", "source", "target_path", "summary", "capabilities", "known_limitations", "validation"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "name": {"type": "string", "minLength": 1},
+    "type": {"type": "string", "minLength": 1},
+    "status": {"enum": ["design-only", "planned", "prototype-artifact", "integrated", "production-ready", "deprecated"]},
+    "version": {"type": ["string", "null"]},
+    "source": {"type": "string", "minLength": 1},
+    "target_path": {"type": "string", "minLength": 1},
+    "summary": {"type": "string", "minLength": 1},
+    "capabilities": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "known_limitations": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "validation": {
+      "type": "object",
+      "required": ["status", "tests", "date", "scope"],
+      "properties": {
+        "status": {"type": "string"},
+        "tests": {"type": ["integer", "null"], "minimum": 0},
+        "date": {"type": "string", "format": "date"},
+        "scope": {"type": "string", "minLength": 1},
+        "note": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
