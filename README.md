@@ -1,70 +1,66 @@
 # Ecosystems Loofy
 
-An internal, modular control plane for coordinating decision components, algorithms, and tools under explicit policies.
+An internal, modular control plane for coordinating decision algorithms and tools under explicit policies, shared state, bounded execution, validation, and authorization.
 
-**Current stage:** architecture and repository foundation. The repository does not yet contain a production execution runtime. The decision-infrastructure prototype described in the registry is a local v0.5.0 artifact and has not yet been imported into this repository.
+**Current stage:** the v0.6.0 delta-matroid decision module is imported and CI-tested. This is an integrated internal prototype—not a production-ready runtime. Durable checkpoints/recovery, hard isolation for blocking work, authenticated authorization, and production side-effect controls remain open work.
 
-## Objectives
-
-- Maintain a machine-readable registry of internal components and their maturity.
-- Define stable contracts for run context, capabilities, budgets, cancellation, checkpoints, validation, and authorized actions.
-- Coordinate compatible decision strategies using explicit state, constraints, policy, and evidence—not arbitrary rotation.
-- Keep execution bounded, observable, testable, and recoverable.
-- Make experimental code distinguishable from validated, integrated, production-ready components.
-
-## Repository map
+## Repository structure
 
 ```text
 .
-├── ecosystem/              # Registry of components and their current integration status
+├── ecosystem/                   # Component registry and maturity records
 ├── docs/
-│   ├── architecture/       # System boundaries, runtime contract, adaptive orchestration
-│   ├── governance/          # Component lifecycle and change policy
-│   ├── operations/          # Validation and release gates
-│   └── roadmap/             # Sequenced implementation plan
+│   ├── architecture/            # System boundaries, execution contract, adaptive orchestration
+│   ├── governance/              # Lifecycle and promotion rules
+│   ├── operations/              # Quality gates
+│   └── roadmap/                 # Sequenced implementation plan
 ├── modules/
-│   └── decision-infrastructure/  # Import plan for the current delta-matroid prototype
-├── schemas/                 # Machine-readable manifest contracts
-├── scripts/                 # Dependency-light repository checks
-├── tests/                   # Tests for repository tooling and contracts
-└── .github/workflows/       # Automated consistency checks
+│   └── decision-infrastructure/ # Algorithms, workflow/portfolio controllers, tests and examples
+├── schemas/                     # Component manifest schema
+├── scripts/                     # Repository validation tooling
+├── tests/                       # Repository-level tests
+└── .github/workflows/           # Automated validation and package build
 ```
 
-## Working principles
+## Integrated decision module
 
-1. **One run context.** Every dispatched capability receives the same run identifier, state snapshot/version, policy, deadline, cancellation signal, budget ledger, and trace context.
-2. **Algorithms propose; policy decides.** An algorithm may rank or propose a candidate. Feasibility checks, policy validation, and explicit authorization govern whether it may proceed.
-3. **Bound every boundary.** Validate inputs before work, check cancellation/deadlines at cooperative checkpoints, cap outputs, and isolate untrusted or non-cooperative work when hard enforcement is required.
-4. **Make state transitions explicit.** Persist checkpoints and outcomes before claiming durable completion.
-5. **Fail closed.** Missing policy, invalid state, exceeded budget, failed invariants, or unresolved authorization must stop execution safely.
-6. **Publish evidence, not adjectives.** Maturity claims must cite tests, reproducible validation, known limitations, and the exact revision assessed.
+The imported module provides LocalSearch, SignedGreedy, MonotonePath, guarded StrongPath, SchurPath over exact supported fields, MatchingSep, a capability registry, a declarative workflow DAG controller, adaptive state-aware portfolio scheduling, SQLite run history, and bounded runtime checks.
 
-## Current implementation status
+The current CI validates registry paths and Markdown links, runs root tests, installs and compiles the decision module, runs its 59-test package suite, and builds a wheel. The successful import/CI run is [GitHub Actions run 40130032418](https://github.com/looloofy69-sketch/Ecosystems-loofy/actions/runs/40130032418), which passed at commit `9439c0ebcff2901a505adbdf0a6d0434b44c24ce`.
 
-The registry records the decision-infrastructure workbench as a prototype artifact. Its v0.5.0 package includes delta-matroid algorithms, adaptive portfolio scheduling, SQLite history, and standalone runtime guard primitives. The previously run local test suite reported 53 passing tests. These are facts about that local artifact only: they are **not** CI results for this repository, and the runtime guards are not yet integrated into every controller.
+## Operating principles
 
-See:
+1. **One effective run context:** propagate run ID, state version, policy, deadlines, cancellation, budget, and trace data consistently.
+2. **Algorithms propose; validation decides:** no strategy is trusted solely because it reports success.
+3. **Bound execution:** use preflight checks, cooperative cancellation/deadline checkpoints, and input/output size limits; use process isolation where hard enforcement is necessary.
+4. **Separate proposal, validation, authorization, and commit:** planning does not grant permission to cause side effects.
+5. **Persisted history is not recovery:** SQLite run logs do not yet provide checkpoints, resume semantics, or exactly-once external operations.
+6. **Publish evidence, not adjectives:** component status must match tests, CI, documented limitations, and the revision assessed.
+
+## Key documents
+
 - [System model](docs/architecture/system-model.md)
 - [Execution contract](docs/architecture/execution-contract.md)
 - [Adaptive orchestration](docs/architecture/adaptive-orchestration.md)
 - [Component lifecycle](docs/governance/component-lifecycle.md)
-- [Roadmap](docs/roadmap/ROADMAP.md)
-- [Decision-infrastructure import plan](modules/decision-infrastructure/README.md)
-- [Registry](ecosystem/registry.json)
+- [Quality and release gates](docs/operations/quality-gates.md)
+- [Implementation roadmap](docs/roadmap/ROADMAP.md)
+- [Decision module README](modules/decision-infrastructure/README.md)
+- [Component registry](ecosystem/registry.json)
+- [Validation report](modules/decision-infrastructure/VALIDATION_REPORT.md)
 
-## Validate the repository
+## Validate locally
 
-Requires Python 3.11 or newer; no third-party package is needed for the repository checks.
+Use Python 3.12 (the CI baseline) and install the package:
 
-```bash
-python scripts/validate_registry.py
-python -m unittest discover -s tests -v
-```
+    python scripts/validate_registry.py
+    python -m unittest discover -s tests -v
+    python -m pip install -e modules/decision-infrastructure
+    python -m unittest discover -s modules/decision-infrastructure/tests -v
+    python -m pip wheel modules/decision-infrastructure --no-deps -w /tmp/delta-infra-wheel
 
-## Scope and non-goals
+The package requires NetworkX 3.x. See the module README for CLI examples and mathematical preconditions.
 
-This repository is the source of truth for architecture and integration contracts. It is not yet a hosted service, agent marketplace, workflow SaaS product, or claim that each listed subsystem is implemented. Local prototypes remain experimental until their source is imported, tested in CI, integrated behind the declared interfaces, and reviewed against the release gates.
+## Security and licensing
 
-## Security and contribution
-
-Do not commit credentials, user data, private keys, or production secrets. See [SECURITY.md](SECURITY.md) and [CONTRIBUTING.md](CONTRIBUTING.md). No license has been selected yet; the repository should not be treated as open-source licensed until an explicit license decision and license file are committed.
+Do not commit credentials, private keys, production secrets, or sensitive inputs. Workflow run history can store input/output payloads. See [SECURITY.md](SECURITY.md) and [CONTRIBUTING.md](CONTRIBUTING.md). No license has been selected; the repository must not yet be treated as released under an open-source license.
