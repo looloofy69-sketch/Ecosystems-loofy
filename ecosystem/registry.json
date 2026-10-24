@@ -27,10 +27,10 @@
       "name": "Delta-matroid decision infrastructure",
       "type": "decision-engine",
       "status": "integrated",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "source": "this-repository",
       "target_path": "modules/decision-infrastructure/",
-      "summary": "Oracle-driven delta-matroid algorithms, matching and matrix backends, declarative workflow execution, state-aware portfolio scheduling, SQLite run history, and controller-boundary runtime guards.",
+      "summary": "Oracle-driven delta-matroid algorithms, matching and matrix backends, declarative workflow execution, adaptive portfolio scheduling, shared run context, SQLite task checkpoints, and bounded recovery for retry-safe workflows.",
       "capabilities": [
         "local-search",
         "signed-greedy",
@@ -42,24 +42,28 @@
         "candidate-merging",
         "sqlite-history",
         "workflow-dag",
+        "run-context",
         "cooperative-cancellation",
-        "input-output-budget-guards"
+        "input-output-budget-guards",
+        "sqlite-checkpoint-resume",
+        "side-effect-approval-gate"
       ],
       "known_limitations": [
-        "Cancellation and deadlines are checked cooperatively and cannot forcibly interrupt a blocked capability.",
+        "Cancellation and deadlines are cooperative and cannot forcibly interrupt a blocked capability.",
         "Serialized byte limits do not enforce CPU or memory quotas.",
-        "SQLite history is not a durable checkpoint/resume or exactly-once side-effect protocol.",
-        "Workflow approval flags are not authenticated identity or an authorization service.",
+        "SQLite checkpoints recover declarative workflows only for retry-safe capabilities; they are not an external transaction log or exactly-once side-effect protocol.",
+        "Workflow approval flags are not authenticated identity or a full authorization service.",
+        "Portfolio state is not yet restart-resumable from per-turn checkpoints.",
         "StrongPath must retain the verified-lift condition; parity correction alone is not a universally valid lift.",
         "Exact matching optimum verification uses bounded exhaustive subset enumeration and is intended for small instances.",
         "No production deployment, security audit, or SLO is claimed."
       ],
       "validation": {
         "status": "ci-passed",
-        "tests": 63,
+        "tests": 74,
         "date": "2026-10-24",
-        "scope": "GitHub Actions run 40130032418 at commit 9439c0ebcff2901a505adbdf0a6d0434b44c24ce: 59 module tests and 4 repository tests; package compile and wheel build passed.",
-        "note": "Integrated source and tests passed CI. Production runtime, hard isolation, checkpoint recovery, and authenticated action authorization remain outside the current implementation."
+        "scope": "GitHub Actions run 40133079284 at commit 153ae59a629ebdc3a4a2cbcbd8bff1c5943c9693: 70 module tests and 4 repository tests; registry/link checks, package install, compileall, CLI smoke tests, and wheel build passed.",
+        "note": "This supports integrated status only. Hard isolation, authenticated authorization, authoritative state compare-and-swap, portfolio checkpoint recovery, and production operations remain incomplete."
       }
     }
   ]

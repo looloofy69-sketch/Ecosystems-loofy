@@ -28,7 +28,7 @@ The module has a shared RunContext with an immutable policy snapshot and a budge
 
 ## Validation and release evidence
 
-Every code-changing push triggers repository checks, package compilation, package tests, and a wheel build. The previous validated baseline was [CI run 40130032418](https://github.com/looloofy69-sketch/Ecosystems-loofy/actions/runs/40130032418) for v0.6.0. The 0.7.0 validation report will record the exact successful run for the current shared-context and recovery implementation before release status is finalized.
+The v0.7.0 revision was validated in [GitHub Actions run 40133079284](https://github.com/looloofy69-sketch/Ecosystems-loofy/actions/runs/40133079284) at commit 153ae59a629ebdc3a4a2cbcbd8bff1c5943c9693. Registry/link validation, 4 repository tests, package installation, compileall, 70 decision-module tests, CLI smoke tests, and wheel build all passed. This is evidence for an integrated internal prototype, not production readiness.
 
 ## Key documents
 
