@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "repository": "looloofy69-sketch/Ecosystems-loofy",
+  "stage": "foundation",
+  "updated_at": "2026-10-24",
+  "components": [
+    {
+      "id": "ecosystem-control-plane",
+      "name": "Ecosystem control plane",
+      "type": "orchestration",
+      "status": "design-only",
+      "version": null,
+      "source": "this-repository",
+      "target_path": "docs/architecture/",
+      "summary": "Defines run context, policy boundaries, component lifecycle, orchestration, and evidence requirements.",
+      "capabilities": ["component-registry", "execution-contract", "governance", "quality-gates"],
+      "known_limitations": ["No production execution controller is implemented in this repository yet."],
+      "validation": {"status": "repository-foundation-only", "tests": null, "date": "2026-10-24", "scope": "Documentation and registry consistency only."}
+    },
+    {
+      "id": "delta-decision-infrastructure",
+      "name": "Delta-matroid decision infrastructure",
+      "type": "decision-engine",
+      "status": "prototype-artifact",
+      "version": "0.5.0",
+      "source": "local-artifact-not-yet-imported",
+      "target_path": "modules/decision-infrastructure/",
+      "summary": "Prototype workbench for delta-matroid algorithms, adaptive portfolio scheduling, candidate merging, feasibility checks, and SQLite history.",
+      "capabilities": ["local-search", "signed-greedy", "monotone-path", "guarded-strong-path", "schur-path", "matching-separator", "adaptive-portfolio", "candidate-merging", "sqlite-history", "runtime-guard-primitives"],
+      "known_limitations": [
+        "The v0.5.0 source package has not yet been imported into this repository.",
+        "Runtime budget and cancellation guards are standalone primitives, not enforcement integrated into every controller.",
+        "Cancellation and deadline checks are cooperative and cannot forcibly preempt a blocking capability.",
+        "StrongPath must retain the verified-lift condition; parity correction alone is not a universally valid lift.",
+        "Exact matching verification was exercised only on small instances in the prototype."
+      ],
+      "validation": {
+        "status": "passed-locally",
+        "tests": 53,
+        "date": "2026-10-24",
+        "scope": "Local v0.5.0 artifact only; not this repository's CI.",
+        "note": "The local suite reported 53 passing tests. This is not evidence of ecosystem-runtime integration."
+      }
+    }
+  ]
+}
