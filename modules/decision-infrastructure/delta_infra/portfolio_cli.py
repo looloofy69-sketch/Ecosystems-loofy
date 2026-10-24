@@ -13,6 +13,7 @@ from .portfolio import (
     StrategyCatalog, StrategyTurn, merge_candidate_outputs,
 )
 from .registry import default_registry
+from .runtime import RunContext
 from .workflow import WorkflowRunStore
 
 
@@ -92,12 +93,12 @@ def build_explicit_optimization_portfolio(instance: Mapping[str, Any]):
         preserve = (*preserve, "alternate_initial")
 
     def solver_step(strategy_name: str, capability: str, start_key: str | None = None):
-        def step(state: Mapping[str, Any]) -> StrategyTurn:
+        def step(state: Mapping[str, Any], *, context: RunContext | None = None) -> StrategyTurn:
             start = state["initial"] if start_key is None else state[start_key]
             payload = {"ground_set": state["ground_set"], "feasible_sets": state["feasible_sets"],
                        "weights": state["weights"],
                        **({"initial": start} if capability == "delta_matroid.local_search" else {})}
-            result = registry.run(capability, payload)
+            result = registry.run(capability, payload, context=context)
             next_state = dict(state)
             next_features = dict(state["features"])
             pending = list(next_features["pending_solvers"])
@@ -142,10 +143,10 @@ def build_explicit_optimization_portfolio(instance: Mapping[str, Any]):
         preserve_keys=preserve, description="Best-improvement search from requested feasible initial set.",
     ))
     if alternate is not None:
-        def restart_step(state: Mapping[str, Any]) -> StrategyTurn:
+        def restart_step(state: Mapping[str, Any], *, context: RunContext | None = None) -> StrategyTurn:
             payload = {"ground_set": state["ground_set"], "feasible_sets": state["feasible_sets"],
                        "weights": state["weights"], "initial": state["alternate_initial"]}
-            result = registry.run("delta_matroid.local_search", payload)
+            result = registry.run("delta_matroid.local_search", payload, context=context)
             next_state = dict(state)
             features = dict(state["features"])
             pending = list(features["pending_solvers"])
