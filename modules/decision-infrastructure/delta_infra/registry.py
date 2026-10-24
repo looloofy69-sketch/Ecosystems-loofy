@@ -108,12 +108,13 @@ def _explicit_system(payload):
 def _register_explicit_optimization(registry: CapabilityRegistry) -> None:
     from .algorithms import local_search, signed_greedy
 
-    def run_local_search(payload):
+    def run_local_search(payload, *, context: RunContext | None = None):
         ground, system = _explicit_system(payload)
         system.verify_delta_matroid()
         weights = _normalise_weights(ground, payload["weights"])
         result = local_search(ground, weights, payload["initial"], system.member,
-                              max_improving_moves=payload.get("max_improving_moves"))
+                              max_improving_moves=payload.get("max_improving_moves"),
+                              checkpoint=context.checkpoint if context is not None else None)
         return {
             "solution": _ordered(result.solution, ground), "objective_value": result.objective_value,
             "history": [_ordered(X, ground) for X in result.history],
@@ -123,11 +124,12 @@ def _register_explicit_optimization(registry: CapabilityRegistry) -> None:
             "trace": result.trace,
         }
 
-    def run_signed_greedy(payload):
+    def run_signed_greedy(payload, *, context: RunContext | None = None):
         ground, system = _explicit_system(payload)
         system.verify_delta_matroid()
         weights = _normalise_weights(ground, payload["weights"])
-        result = signed_greedy(ground, weights, system.separate, verify_result=True)
+        result = signed_greedy(ground, weights, system.separate, verify_result=True,
+                               checkpoint=context.checkpoint if context is not None else None)
         return {
             "solution": _ordered(result.solution, ground), "objective_value": result.objective_value,
             "negative_weight_set": _ordered(result.negative_weight_set, ground),
@@ -154,11 +156,12 @@ def _register_explicit_optimization(registry: CapabilityRegistry) -> None:
 def _register_path_capabilities(registry: CapabilityRegistry) -> None:
     from .algorithms import monotone_path, strong_path_explicit
 
-    def run_monotone_path(payload):
+    def run_monotone_path(payload, *, context: RunContext | None = None):
         ground, system = _explicit_system(payload)
         system.verify_even_delta_matroid()
         result = monotone_path(ground, payload["A"], payload["B"], system.member,
-                               assume_even_delta_matroid=True)
+                               assume_even_delta_matroid=True,
+                               checkpoint=context.checkpoint if context is not None else None)
         return {
             "path": [_ordered(X, ground) for X in result.path], "steps": result.steps,
             "membership_queries": result.membership_queries,
@@ -166,10 +169,10 @@ def _register_path_capabilities(registry: CapabilityRegistry) -> None:
             "endpoint_validation_queries": result.endpoint_validation_queries, "trace": result.trace,
         }
 
-    def run_strong_path(payload):
+    def run_strong_path(payload, *, context: RunContext | None = None):
         ground, system = _explicit_system(payload)
         result = strong_path_explicit(ground, system.feasible_sets, payload["A"], payload["B"],
-                                      dummy=payload.get("dummy", "*"))
+                                      dummy=payload.get("dummy", "*"), checkpoint=context.checkpoint if context is not None else None)
         lifted_order = tuple(ground) + (payload.get("dummy", "*"),)
         return {
             "path": [_ordered(X, ground) for X in result.path],
@@ -195,7 +198,7 @@ def _register_path_capabilities(registry: CapabilityRegistry) -> None:
 def _register_matrix_capability(registry: CapabilityRegistry) -> None:
     from .matrix import PrimeField, RationalField, schur_path
 
-    def run_schur(payload):
+    def run_schur(payload, *, context: RunContext | None = None):
         field_spec = payload.get("field", "Q")
         if field_spec == "Q" or field_spec is None:
             selected_field = RationalField()
@@ -204,7 +207,8 @@ def _register_matrix_capability(registry: CapabilityRegistry) -> None:
         else:
             raise ValueError("field must be 'Q' or {'type': 'GF', 'p': prime_integer}")
         labels = payload.get("labels")
-        result = schur_path(payload["matrix"], labels, field=selected_field)
+        result = schur_path(payload["matrix"], labels, field=selected_field,
+                            checkpoint=context.checkpoint if context is not None else None)
         label_order = tuple(range(len(payload["matrix"]))) if labels is None else tuple(labels)
         return {
             "complete": result.complete, "pairs": [list(pair) for pair in result.pairs],
@@ -225,9 +229,10 @@ def _register_matrix_capability(registry: CapabilityRegistry) -> None:
 def _register_matching_capabilities(registry: CapabilityRegistry) -> None:
     from .matching import matching_separate, signed_greedy_matching_delta_matroid
 
-    def run_match_sep(payload):
+    def run_match_sep(payload, *, context: RunContext | None = None):
         vertices = tuple(payload["vertices"])
-        result = matching_separate(vertices, payload["edges"], payload["S"], payload["T"])
+        result = matching_separate(vertices, payload["edges"], payload["S"], payload["T"],
+                                   checkpoint=context.checkpoint if context is not None else None)
         return {
             "feasible": result.feasible, "score": result.score, "required_score": result.required_score,
             "matching": [list(edge) for edge in result.matching],
@@ -235,10 +240,11 @@ def _register_matching_capabilities(registry: CapabilityRegistry) -> None:
             "witness_feasible_set": _ordered(result.witness_feasible_set, vertices),
         }
 
-    def run_matching_greedy(payload):
+    def run_matching_greedy(payload, *, context: RunContext | None = None):
         vertices = tuple(payload["vertices"])
         weights = _normalise_weights(vertices, payload["weights"])
-        return signed_greedy_matching_delta_matroid(vertices, payload["edges"], weights)
+        return signed_greedy_matching_delta_matroid(vertices, payload["edges"], weights,
+                                                     checkpoint=context.checkpoint if context is not None else None)
 
     registry.register(Capability(
         "matching.separation", "0.3.0",
