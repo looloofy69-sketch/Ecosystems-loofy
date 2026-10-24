@@ -1,9 +1,9 @@
 # Delta-Infrastructure Decision Module
 
-**Version:** 0.6.0  
+**Version:** 0.7.0  
 **Status:** integrated module; not production-ready.
 
-This package provides deterministic delta-matroid algorithms, a capability registry, a declarative workflow controller, a state-aware strategy portfolio, a SQLite run ledger, and cooperative runtime guard enforcement at task and portfolio controller boundaries.
+This package provides deterministic delta-matroid algorithms, a capability registry, a declarative workflow controller, a state-aware strategy portfolio, a SQLite run ledger, and a shared RunContext with budget accounting, cooperative runtime guard enforcement, and durable task-level checkpoints for retry-safe workflow recovery.
 
 ## Included algorithms
 
@@ -19,11 +19,11 @@ This package provides deterministic delta-matroid algorithms, a capability regis
 
 The registry exposes seven JSON-callable capabilities. Workflow documents may invoke only registered capabilities and allow-listed built-ins; they cannot load Python modules, execute shell commands, or evaluate expressions.
 
-## Runtime integration in v0.6.0
+## Runtime integration in v0.7.0
 
-TaskExecutionController and PortfolioController accept an ExecutionBudget and cooperative cancellation callback. Controller-boundary checks cover planned task/turn counts, serialized input sizes, deadline/cancellation checkpoints, and output-size checks before task output or portfolio state is committed. Runtime stop outcomes are recorded as cancelled or budget-exceeded where execution has begun.
+TaskExecutionController and PortfolioController accept an ExecutionBudget and cooperative cancellation callback. Controller-boundary checks cover planned task/turn counts, serialized input sizes, deadline/cancellation checkpoints, and output-size checks before task output or portfolio state is committed. Runtime stop outcomes are recorded as cancelled or budget-exceeded where execution has begun. The immutable policy snapshot and budget ledger travel with the RunContext; deterministic handlers receive checkpoints inside longer algorithm loops.
 
-Important limits remain:
+Checkpoints are append-only and sequence-checked in SQLite. Resume requires the same canonical workflow definition and database, rejects completed runs, and permits retry only for capabilities declared side-effect-free/read-only and retry-safe. To resume, supply the same workflow file and `--db` path with `--resume RUN_ID`.\n\nImportant limits remain:
 - Preflight rejection happens before a run record exists.
 - Runtime checks are cooperative. They do not interrupt a blocking capability or strategy.
 - Serialized byte limits do not enforce CPU or memory usage.
