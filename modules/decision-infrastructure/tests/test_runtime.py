@@ -17,6 +17,17 @@ class RuntimeGuardTests(unittest.TestCase):
 
 
 class RunContextTests(unittest.TestCase):
+
+    def test_policy_snapshot_is_deeply_immutable(self):
+        context = RunContext.create(policy_snapshot={"nested": {"items": [1, 2]}})
+        with self.assertRaises(TypeError):
+            context.policy_snapshot["new"] = "not allowed"
+        with self.assertRaises(TypeError):
+            context.policy_snapshot["nested"]["items"][0] = 9
+        with self.assertRaises(RuntimePolicyError):
+            context.set_policy_snapshot({"new": "snapshot"})
+        self.assertEqual(context.checkpoint_metadata()["policy_snapshot"], {"nested": {"items": [1, 2]}})
+
     def test_shared_context_tracks_tasks_inputs_outputs_and_checkpoints(self):
         budget = ExecutionBudget(max_tasks=3, max_input_bytes=100, max_output_bytes=1000)
         context = RunContext.create(budget=budget, policy_snapshot={"policy": "test"})
