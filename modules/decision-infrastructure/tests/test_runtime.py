@@ -12,6 +12,8 @@ class RuntimeGuardTests(unittest.TestCase):
         with self.assertRaises(ExecutionCancelled): RuntimeGuard(cancelled=lambda: True).checkpoint()
     def test_invalid_budget_rejected(self):
         with self.assertRaises(RuntimePolicyError): ExecutionBudget(max_tasks=0)
+        with self.assertRaises(RuntimePolicyError): ExecutionBudget(max_duration_seconds=float("inf"))
+        with self.assertRaises(RuntimePolicyError): ExecutionBudget(max_duration_seconds=float("nan"))
     def test_normal_checkpoint(self):
         guard = RuntimeGuard(); guard.preflight(1, {"small": True}); guard.check_output({"result": "ok"})
 
