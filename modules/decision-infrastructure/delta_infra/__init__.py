@@ -37,5 +37,5 @@ __all__ += [
     "TransitionContractError", "capability_strategy", "merge_candidate_outputs", "CandidateMergeError",
 ]
 
-from .runtime import ExecutionBudget, ExecutionBudgetExceeded, ExecutionCancelled, RuntimeGuard, RuntimePolicyError
-__all__ += ["ExecutionBudget", "ExecutionBudgetExceeded", "ExecutionCancelled", "RuntimeGuard", "RuntimePolicyError"]
+from .runtime import BudgetLedger, ExecutionBudget, ExecutionBudgetExceeded, ExecutionCancelled, RunContext, RuntimeGuard, RuntimePolicyError
+__all__ += ["BudgetLedger", "ExecutionBudget", "ExecutionBudgetExceeded", "ExecutionCancelled", "RunContext", "RuntimeGuard", "RuntimePolicyError"]
