@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "delta-infra-workbench"
+version = "0.6.0"
+description = "Oracle-driven delta-matroid algorithms with matching, matrix, and bounded runtime controllers"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["networkx>=3.2,<4"]
+
+[project.scripts]
+delta-infra = "delta_infra.cli:main"
+delta-infra-run = "delta_infra.workflow_cli:main"
+delta-infra-portfolio = "delta_infra.portfolio_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["delta_infra*"]
