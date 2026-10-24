@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import lru_cache
+import hashlib
 import json
 import math
 import sqlite3
@@ -21,7 +22,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from .matching import normalize_graph
 from .registry import CapabilityRegistry, default_registry
-from .runtime import ExecutionBudget, ExecutionBudgetExceeded, ExecutionCancelled, RuntimeGuard
+from .runtime import BudgetLedger, ExecutionBudget, ExecutionBudgetExceeded, ExecutionCancelled, RunContext, RuntimeGuard
 
 
 class WorkflowDefinitionError(ValueError):
@@ -340,6 +341,19 @@ class WorkflowRunStore:
                 )
             """)
             connection.execute("CREATE INDEX IF NOT EXISTS workflow_runs_started_at_idx ON workflow_runs(started_at DESC)")
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS workflow_checkpoints (
+                    run_id TEXT NOT NULL,
+                    sequence INTEGER NOT NULL,
+                    workflow_id TEXT NOT NULL,
+                    workflow_fingerprint TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    checkpoint_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (run_id, sequence)
+                )
+            """)
+            connection.execute("CREATE INDEX IF NOT EXISTS workflow_checkpoints_latest_idx ON workflow_checkpoints(run_id, sequence DESC)")
 
     @contextmanager
     def _connect(self):
@@ -358,7 +372,9 @@ class WorkflowRunStore:
         serialized = json.dumps(record, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO workflow_runs(run_id, workflow_id, started_at, finished_at, status, record_json) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO workflow_runs(run_id, workflow_id, started_at, finished_at, status, record_json) VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(run_id) DO UPDATE SET workflow_id=excluded.workflow_id, started_at=excluded.started_at, "
+                "finished_at=excluded.finished_at, status=excluded.status, record_json=excluded.record_json",
                 (record["run_id"], record["workflow_id"], record["started_at"], record["finished_at"], record["status"], serialized),
             )
 
@@ -366,6 +382,66 @@ class WorkflowRunStore:
         with self._connect() as connection:
             row = connection.execute("SELECT record_json FROM workflow_runs WHERE run_id = ?", (run_id,)).fetchone()
         return json.loads(row["record_json"]) if row else None
+
+    def save_checkpoint(
+        self,
+        *,
+        run_id: str,
+        workflow_id: str,
+        workflow_fingerprint: str,
+        status: str,
+        checkpoint: Mapping[str, Any],
+        expected_previous_sequence: int | None,
+    ) -> int:
+        """Append a checkpoint iff its expected previous sequence still matches.
+
+        The comparison and insert occur in one SQLite write transaction so stale
+        writers cannot silently overwrite a newer recovery point.
+        """
+        serialized = json.dumps(checkpoint, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+        if not run_id or not workflow_id or not workflow_fingerprint:
+            raise ValueError("run_id, workflow_id, and workflow_fingerprint must be non-empty")
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT MAX(sequence) AS sequence FROM workflow_checkpoints WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            actual = row["sequence"] if row and row["sequence"] is not None else None
+            if actual != expected_previous_sequence:
+                raise WorkflowInputError(
+                    f"Checkpoint conflict for run {run_id!r}: expected previous sequence "
+                    f"{expected_previous_sequence!r}, found {actual!r}"
+                )
+            sequence = 1 if actual is None else actual + 1
+            connection.execute(
+                "INSERT INTO workflow_checkpoints(run_id, sequence, workflow_id, workflow_fingerprint, status, checkpoint_json, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (run_id, sequence, workflow_id, workflow_fingerprint, status, serialized, _utc_now()),
+            )
+        return sequence
+
+    def get_latest_checkpoint(self, run_id: str) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT run_id, sequence, workflow_id, workflow_fingerprint, status, checkpoint_json, created_at "
+                "FROM workflow_checkpoints WHERE run_id = ? ORDER BY sequence DESC LIMIT 1",
+                (run_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        result["checkpoint"] = json.loads(result.pop("checkpoint_json"))
+        return result
+
+    def list_checkpoints(self, run_id: str) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT run_id, sequence, workflow_id, workflow_fingerprint, status, created_at "
+                "FROM workflow_checkpoints WHERE run_id = ? ORDER BY sequence",
+                (run_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def list_runs(self, limit: int = 20) -> list[dict[str, Any]]:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1 or limit > 1000:
