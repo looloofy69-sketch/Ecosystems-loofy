@@ -63,13 +63,19 @@ class ExplicitFamilyOracle:
             raise ValueError("Include and exclude constraints must be disjoint")
         return any(P <= F and not (Q & F) for F in self.feasible_sets)
 
-    def is_delta_matroid(self) -> bool:
+    def is_delta_matroid(self, *, checkpoint: Callable[[], None] | None = None) -> bool:
         """Check symmetric exchange in O(|F|^2 * |E|^2) time."""
         family = self.feasible_sets
         for X in family:
+            if checkpoint is not None:
+                checkpoint()
             for Y in family:
+                if checkpoint is not None:
+                    checkpoint()
                 delta = X ^ Y
                 for x in delta:
+                    if checkpoint is not None:
+                        checkpoint()
                     if not any((X ^ frozenset((x, y))) in family for y in delta):
                         return False
         return True
@@ -77,12 +83,12 @@ class ExplicitFamilyOracle:
     def is_even(self) -> bool:
         return len({len(F) % 2 for F in self.feasible_sets}) == 1
 
-    def verify_delta_matroid(self) -> None:
-        if not self.is_delta_matroid():
+    def verify_delta_matroid(self, *, checkpoint: Callable[[], None] | None = None) -> None:
+        if not self.is_delta_matroid(checkpoint=checkpoint):
             raise ValueError("The supplied feasible family violates the symmetric exchange axiom")
 
-    def verify_even_delta_matroid(self) -> None:
-        self.verify_delta_matroid()
+    def verify_even_delta_matroid(self, *, checkpoint: Callable[[], None] | None = None) -> None:
+        self.verify_delta_matroid(checkpoint=checkpoint)
         if not self.is_even():
             raise ValueError("Algorithm 3 requires all feasible sets to have the same parity")
 
