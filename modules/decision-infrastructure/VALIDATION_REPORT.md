@@ -1,25 +1,28 @@
-# Validation report — Delta-Infrastructure 0.6.0
+# Validation report — Delta-Infrastructure 0.7.0
 
-## Verified CI result
+## Scope of this revision
+
+This revision adds a typed RunContext, immutable policy snapshots, shared budget accounting, inner-loop cooperative cancellation, append-only SQLite task checkpoints with sequence conflict protection, deterministic workflow fingerprinting, retry-safety checks, workflow CLI resume support, and explicit approval declarations for side-effecting capabilities.
+
+## Previous validated baseline (0.6.0)
 
 - **Workflow:** [Repository validation, run 40130032418](https://github.com/looloofy69-sketch/Ecosystems-loofy/actions/runs/40130032418)
 - **Validated commit:** `9439c0ebcff2901a505adbdf0a6d0434b44c24ce`
 - **Conclusion:** success
-- **Steps passed:** registry/Markdown consistency, root repository tests, editable package installation, package compileall, decision-module tests, wheel build.
-- **Test count:** 59 tests in the decision-module suite and 4 tests in repository tooling; both test steps passed.
-- **Build:** Python wheel build passed in CI.
+- **Tests:** 59 decision-module tests plus 4 repository tests; compilation and wheel build passed.
 
-The validated revision includes the imported package, package tests, examples and runtime integration test suite. Subsequent edits to registry and documentation do not change the package source; the workflow reruns for each push to main.
+## Validation for 0.7.0
 
-## Scope
+The 0.7.0 validation run must be recorded only after GitHub Actions finishes on the exact current commit. It must cover repository registry/link checks, root tests, package installation, compileall, the full decision-module tests, and wheel creation. The 0.6.0 result above does not validate these new changes.
 
-The package suite covers oracle-based algorithms, exhaustive small mathematical instances, matching separation/optimization against independent definitions, Schur-pivot exactness, portfolio scheduling and transition contracts, workflow validation/persistence, runtime guard primitives, and controller-boundary enforcement.
-
-## Limits
+## Known limitations
 
 - Cancellation/deadline checks are cooperative; blocking code is not forcibly terminated.
-- Serialized size limits do not replace process-level CPU/memory quotas.
-- SQLite history is not a checkpoint-and-resume or exactly-once side-effect protocol.
+- The task controller recovers only registered capabilities that explicitly declare retry safety and no external/write effects, plus known pure built-ins. A failed in-flight task may be re-executed if no success checkpoint was committed.
+- Checkpoint history is an internal task ledger, not a checkpoint/resume protocol for external side effects or distributed transactions.
+- RunContext currently propagates to algorithms but not to every library-internal operation; NetworkX blossom matching is checked before/after its non-interruptible call.
+- Serialized byte limits do not replace process-level CPU/memory quotas.
+- Portfolio state is not yet restart-resumable from per-turn checkpoints.
 - Workflow approval flags do not provide authenticated identity, RBAC, or cryptographic audit.
 - Matching optimum verification is bounded exhaustive verification for small instances.
 - No production deployment, security audit, or SLO has been claimed.
