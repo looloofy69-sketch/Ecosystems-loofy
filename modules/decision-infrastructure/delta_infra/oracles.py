@@ -54,14 +54,19 @@ class ExplicitFamilyOracle:
     def __call__(self, candidate: FrozenSetT) -> bool:
         return self.member(candidate)
 
-    def separate(self, include: Iterable[Element], exclude: Iterable[Element]) -> bool:
+    def separate(self, include: Iterable[Element], exclude: Iterable[Element], *, checkpoint: Callable[[], None] | None = None) -> bool:
         P, Q = frozenset(include), frozenset(exclude)
         E = frozenset(self.ground_set)
         if not P <= E or not Q <= E:
             raise ValueError("Separation constraints must be subsets of the ground set")
         if P & Q:
             raise ValueError("Include and exclude constraints must be disjoint")
-        return any(P <= F and not (Q & F) for F in self.feasible_sets)
+        for F in self.feasible_sets:
+            if checkpoint is not None:
+                checkpoint()
+            if P <= F and not (Q & F):
+                return True
+        return False
 
     def is_delta_matroid(self, *, checkpoint: Callable[[], None] | None = None) -> bool:
         """Check symmetric exchange in O(|F|^2 * |E|^2) time."""
@@ -76,7 +81,14 @@ class ExplicitFamilyOracle:
                 for x in delta:
                     if checkpoint is not None:
                         checkpoint()
-                    if not any((X ^ frozenset((x, y))) in family for y in delta):
+                    found = False
+                    for y in delta:
+                        if checkpoint is not None:
+                            checkpoint()
+                        if (X ^ frozenset((x, y))) in family:
+                            found = True
+                            break
+                    if not found:
                         return False
         return True
 
