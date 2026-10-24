@@ -1,0 +1,15 @@
+{
+  "workflow_id": "internal-matching-validation",
+  "description": "Run matching delta-matroid SignedGreedy, independently verify the small instance, and decide whether it is eligible for an internal shadow-mode trial.",
+  "tasks": [
+    {"id": "optimize", "type": "capability", "capability": "matching.signed_greedy",
+      "inputs": {"vertices": ["A", "B", "C", "D"], "edges": [["A", "B"], ["B", "C"], ["C", "D"]],
+        "weights": {"A": 5, "B": -3, "C": 4, "D": 2}}},
+    {"id": "verify", "type": "builtin", "handler": "verify_matching_optimum", "depends_on": ["optimize"],
+      "inputs": {"vertices": ["A", "B", "C", "D"], "edges": [["A", "B"], ["B", "C"], ["C", "D"]],
+        "weights": {"A": 5, "B": -3, "C": 4, "D": 2}, "solution": {"$ref": "optimize.solution"},
+        "reported_objective_value": {"$ref": "optimize.objective_value"}, "max_vertices": 12}},
+    {"id": "shadow_gate", "type": "builtin", "handler": "decide_internal_shadow_gate", "depends_on": ["optimize", "verify"],
+      "inputs": {"optimization": {"$ref": "optimize"}, "verification": {"$ref": "verify"}}}
+  ]
+}
