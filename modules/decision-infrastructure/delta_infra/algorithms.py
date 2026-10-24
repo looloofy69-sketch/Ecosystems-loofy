@@ -293,6 +293,7 @@ def strong_path_oracle(
     original_membership_oracle: MembershipOracleProtocol,
     *,
     lift_exchange_guaranteed: bool = False,
+    checkpoint: Callable[[], None] | None = None,
 ) -> StrongPathOracleResult:
     """Oracle-only Algorithm 3' with an externally guaranteed valid lift."""
     if not lift_exchange_guaranteed:
