@@ -18,8 +18,12 @@ def main() -> None:
                         help="Explicitly approve tasks that declare requires_approval=true")
     parser.add_argument("--history", action="store_true", help="List recent runs instead of executing a workflow")
     parser.add_argument("--show-run", metavar="RUN_ID", help="Print a previously saved run")
+    parser.add_argument("--resume", metavar="RUN_ID", help="Resume a compatible checkpointed run from the same workflow JSON and SQLite database")
     parser.add_argument("--limit", type=int, default=20, help="Maximum recent runs to show with --history (1..1000)")
     args = parser.parse_args()
+    selected_modes = sum(bool(value) for value in (args.history, args.show_run, args.resume))
+    if selected_modes > 1:
+        parser.error("--history, --show-run, and --resume are mutually exclusive modes")
 
     store = WorkflowRunStore(args.db)
     if args.history:
@@ -38,7 +42,11 @@ def main() -> None:
             parser.error(f"Cannot read workflow file: {exc}")
         except json.JSONDecodeError as exc:
             parser.error(f"Invalid workflow JSON: {exc}")
-        output = TaskExecutionController(run_store=store).run(workflow, approved_task_ids=args.approve)
+        controller = TaskExecutionController(run_store=store)
+        if args.resume:
+            output = controller.run(workflow, approved_task_ids=args.approve, resume_from_run_id=args.resume)
+        else:
+            output = controller.run(workflow, approved_task_ids=args.approve)
     print(json.dumps(output, indent=2 if args.pretty else None, ensure_ascii=False, allow_nan=False, default=str))
     if isinstance(output, dict) and output.get("status") in {"failed", "blocked"}:
         raise SystemExit(1)
