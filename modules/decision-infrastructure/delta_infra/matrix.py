@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fractions import Fraction
 from math import isqrt
-from typing import Any, Hashable, Iterable, Protocol, Sequence
+from typing import Any, Callable, Hashable, Iterable, Protocol, Sequence
 
 
 class Field(Protocol):
@@ -85,6 +85,7 @@ def schur_path(
     labels: Iterable[Hashable] | None = None,
     *,
     field: Field | None = None,
+    checkpoint: Callable[[], None] | None = None,
 ) -> SchurPathResult:
     """Find successive nonzero 2x2 pivots and apply Schur complements."""
     F: Field = field or RationalField()
@@ -109,6 +110,8 @@ def schur_path(
     elimination_field_operations = 0
 
     while alive:
+        if checkpoint is not None:
+            checkpoint()
         x_index = 0
         y_index = next((j for j in range(1, len(alive)) if not F.is_zero(S[x_index][j])), None)
         if y_index is None:
@@ -138,6 +141,8 @@ def schur_path(
         elimination_field_operations += 1
         next_S: list[list[Any]] = []
         for r in rest:
+            if checkpoint is not None:
+                checkpoint()
             row = []
             for c in rest:
                 term_1 = F.mul(F.mul(S[r][i], neg_inv_a), S[j][c])
