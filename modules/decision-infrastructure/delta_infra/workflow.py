@@ -214,7 +214,7 @@ def _normalise_graph_and_weights(payload: Mapping[str, Any]):
     return vertices, vertex_set, edges, weights
 
 
-def verify_matching_optimum(payload: Mapping[str, Any]) -> dict[str, Any]:
+def verify_matching_optimum(payload: Mapping[str, Any], *, context: RunContext | None = None) -> dict[str, Any]:
     """Independently verify a matching-delta-matroid optimum by bounded subset enumeration."""
     required = {"vertices", "edges", "weights", "solution", "reported_objective_value"}
     missing = required - set(payload)
@@ -275,6 +275,8 @@ def verify_matching_optimum(payload: Mapping[str, Any]) -> dict[str, Any]:
     subsets_examined = 0
     best_pairing: tuple[tuple[int, int], ...] | None = None
     for mask in range(1 << len(vertices)):
+        if context is not None:
+            context.checkpoint()
         subsets_examined += 1
         pairing = perfect_matching(mask)
         if pairing is None:
