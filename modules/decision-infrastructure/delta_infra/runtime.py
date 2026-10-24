@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 import json
 import time
 import uuid
+from types import MappingProxyType
 from typing import Any, Callable, Mapping
 
 
@@ -31,9 +32,25 @@ def _serialized_size(payload: Any) -> int:
         raise RuntimePolicyError(f"Runtime payload must be finite JSON-compatible data: {exc}") from exc
 
 
+def _plain_json(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _plain_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain_json(item) for item in value]
+    return value
+
+
+def _freeze_json(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType({str(key): _freeze_json(item) for key, item in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_json(item) for item in value)
+    return value
+
+
 def _safe_snapshot(value: Mapping[str, Any], *, label: str) -> dict[str, Any]:
     try:
-        return json.loads(json.dumps(dict(value), ensure_ascii=False, allow_nan=False))
+        return json.loads(json.dumps(_plain_json(value), ensure_ascii=False, allow_nan=False))
     except (TypeError, ValueError) as exc:
         raise RuntimePolicyError(f"{label} must be JSON-compatible: {exc}") from exc
 
@@ -112,11 +129,16 @@ class RunContext:
             raise RuntimePolicyError("cancelled must be callable")
         if not isinstance(self.policy_snapshot, Mapping):
             raise RuntimePolicyError("policy_snapshot must be a mapping")
-        self.policy_snapshot = _safe_snapshot(self.policy_snapshot, label="policy_snapshot")
+        self.policy_snapshot = _freeze_json(_safe_snapshot(self.policy_snapshot, label="policy_snapshot"))
         if not self.trace_id:
             self.trace_id = str(uuid.uuid4())
         if isinstance(self.elapsed_before_start_seconds, bool) or not isinstance(self.elapsed_before_start_seconds, (int, float)) or self.elapsed_before_start_seconds < 0:
             raise RuntimePolicyError("elapsed_before_start_seconds must be non-negative")
+
+    def set_policy_snapshot(self, value: Mapping[str, Any]) -> None:
+        if self.policy_snapshot:
+            raise RuntimePolicyError("policy_snapshot is already set and cannot be replaced")
+        self.policy_snapshot = _freeze_json(_safe_snapshot(value, label="policy_snapshot"))
 
     @classmethod
     def create(
