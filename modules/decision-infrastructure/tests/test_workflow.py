@@ -157,6 +157,20 @@ class DurableCheckpointTests(unittest.TestCase):
             with self.assertRaisesRegex(WorkflowInputError, "successfully completed"):
                 controller.run(doc, resume_from_run_id=result["run_id"])
 
+
+    def test_side_effecting_capability_requires_explicit_approval_declaration(self):
+        registry = default_registry()
+        registry.register(Capability(
+            "test.external", "1.0", "test external side effect", (), (),
+            lambda payload: {"executed": True}, side_effect_class="external", retry_safe=False,
+        ))
+        controller = TaskExecutionController(registry=registry)
+        doc = {"workflow_id": "side-effect-approval-test", "tasks": [
+            {"id": "publish", "type": "capability", "capability": "test.external", "inputs": {}},
+        ]}
+        with self.assertRaisesRegex(WorkflowDefinitionError, "must declare requires_approval=true"):
+            controller.run(doc)
+
     def test_resume_refuses_capability_without_retry_safe_contract(self):
         with tempfile.TemporaryDirectory() as temp:
             store = WorkflowRunStore(Path(temp) / "runs.sqlite3")
@@ -171,9 +185,9 @@ class DurableCheckpointTests(unittest.TestCase):
             ))
             controller = TaskExecutionController(registry=registry, run_store=store)
             doc = {"workflow_id": "unsafe-resume-test", "tasks": [
-                {"id": "unsafe", "type": "capability", "capability": "test.unsafe", "inputs": {}},
+                {"id": "unsafe", "type": "capability", "capability": "test.unsafe", "requires_approval": True, "inputs": {}},
             ]}
-            first = controller.run(doc)
+            first = controller.run(doc, approved_task_ids=["unsafe"])
             self.assertEqual(first["status"], "failed")
             with self.assertRaisesRegex(WorkflowInputError, "not declared retry-safe"):
                 controller.run(doc, resume_from_run_id=first["run_id"])
