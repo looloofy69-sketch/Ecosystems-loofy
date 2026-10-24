@@ -1,0 +1,12 @@
+{
+  "ground_set": ["a", "b", "c", "d"],
+  "feasible_sets": [[], ["a", "b"], ["a", "c"], ["a", "d"], ["b", "c"], ["b", "d"], ["c", "d"], ["a", "b", "c", "d"]],
+  "weights": {"a": 5, "b": -3, "c": 4, "d": 2},
+  "initial": [], "A": [], "B": ["a", "b", "c", "d"],
+  "problem_id": "adaptive-explicit-demo", "portfolio_id": "adaptive-explicit-demo",
+  "scheduler_mode": "rotation",
+  "scheduler_rules": [
+    {"name": "prioritize-verification-stage", "when": [{"field": "phase", "op": "eq", "value": "verify"}], "mode": "shape-driven"},
+    {"name": "alternate-compatible-optimizers", "when": [{"field": "phase", "op": "eq", "value": "optimize"}], "mode": "alternation"}
+  ]
+}
