@@ -1,29 +1,51 @@
-# Decision-infrastructure module: import plan
+# Delta-Infrastructure Decision Module
 
-**Status: prototype artifact — not imported into this repository.**
+**Version:** 0.6.0  
+**Status:** integrated module; not production-ready.
 
-The local v0.5.0 workbench contains delta-matroid local search, signed greedy selection, path routines, skew-matrix Schur pivots, matching separation, adaptive portfolio scheduling, candidate merging, feasibility checks, SQLite history, examples, and standalone runtime guard primitives.
+This package provides deterministic delta-matroid algorithms, a capability registry, a declarative workflow controller, a state-aware strategy portfolio, a SQLite run ledger, and cooperative runtime guard enforcement at task and portfolio controller boundaries.
 
-The local suite reported 53 passing tests on 2026-10-24. The source and tests are not tracked here. That result is not an ecosystem CI result and does not prove runtime integration.
+## Included algorithms
 
-## Import procedure
-1. Import the exact v0.5.0 source, tests, package metadata, examples, and history.
-2. Re-run the complete suite from the committed revision in CI and reconcile differences.
-3. Add package-build and dependency checks after an explicit license review.
-4. Integrate guards into task and portfolio controller boundaries.
-5. Keep StrongPath's verified-lift condition; parity correction alone is not a general correctness guarantee.
-6. Preserve the small-instance scope of exact matching verification.
-7. Promote the registry status only after the [lifecycle gates](../../docs/governance/component-lifecycle.md) pass.
+| Algorithm | Implementation |
+|---|---|
+| LocalSearch | Membership-oracle local improvement through one/two-element flips |
+| SignedGreedy | Twisted separation-oracle optimization |
+| MonotonePath | Pair exchange for even delta-matroids; precondition must be established |
+| StrongPath | Explicit-family mode verifies lifted exchange/parity conditions; oracle mode requires an external contract |
+| SchurPath | Alternating matrix pivots over rationals or prime fields |
+| MatchingSep | Maximum-weight matching for matching-delta-matroid separation |
+| Matching SignedGreedy | Optimization using NetworkX matching |
 
-## Adapter contract
-Accept shared run context and immutable input state; return typed candidate(s), evidence, resource metrics, state version, and normalized status. The adapter may not commit authoritative state or trigger side effects directly.
+The registry exposes seven JSON-callable capabilities. Workflow documents may invoke only registered capabilities and allow-listed built-ins; they cannot load Python modules, execute shell commands, or evaluate expressions.
 
-## Acceptance criteria
-- Imported tests run in CI from this repository revision.
-- Preconditions and limitations are documented.
-- Controller boundaries enforce budget, deadline, cancellation, and output limits.
-- Candidate feasibility is independently validated.
-- Failure, cancellation, unsupported inputs, and timeouts are explicit.
-- Provenance and checkpoint semantics are preserved.
+## Runtime integration in v0.6.0
 
-Related: [system model](../../docs/architecture/system-model.md), [execution contract](../../docs/architecture/execution-contract.md), [adaptive orchestration](../../docs/architecture/adaptive-orchestration.md).
+TaskExecutionController and PortfolioController accept an ExecutionBudget and cooperative cancellation callback. Controller-boundary checks cover planned task/turn counts, serialized input sizes, deadline/cancellation checkpoints, and output-size checks before task output or portfolio state is committed. Runtime stop outcomes are recorded as cancelled or budget-exceeded where execution has begun.
+
+Important limits remain:
+- Preflight rejection happens before a run record exists.
+- Runtime checks are cooperative. They do not interrupt a blocking capability or strategy.
+- Serialized byte limits do not enforce CPU or memory usage.
+- SQLite history is not transactional side-effect management; replay/resume and exactly-once semantics are not provided.
+- Workflow input/output history can contain sensitive data; do not submit secrets.
+- The portfolio is an internal strategy scheduler, not a general autonomous-agent runtime.
+
+## Install and test
+
+Requires Python 3.10+ and NetworkX 3.x.
+
+    python -m pip install -e .
+    python -m unittest discover -s tests -v
+    python -m delta_infra.cli --list-capabilities --pretty
+    python -m delta_infra.workflow_cli examples/workflows/internal_matching_validation.json --pretty
+    python -m delta_infra.portfolio_cli examples/portfolio_adaptive_instance.json --mode auto --pretty
+
+See ARCHITECTURE.md, VALIDATION_REPORT.md, CHANGELOG.md, and the root roadmap.
+
+## Correctness boundaries
+
+- Explicit feasible-family routines validate axioms only on the supplied finite family.
+- Oracle-only path routines require externally established mathematical preconditions.
+- Parity correction is not universally a valid delta-matroid lift; StrongPath must reject failed lift checks.
+- The independent matching optimum verifier uses bounded exhaustive subset enumeration and defaults to at most 12 vertices; it is for small-instance verification, not large-scale solving.
