@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "repository": "looloofy69-sketch/Ecosystems-loofy",
-  "stage": "foundation",
+  "stage": "integration",
   "updated_at": "2026-10-24",
   "components": [
     {
@@ -14,32 +14,52 @@
       "target_path": "docs/architecture/",
       "summary": "Defines run context, policy boundaries, component lifecycle, orchestration, and evidence requirements.",
       "capabilities": ["component-registry", "execution-contract", "governance", "quality-gates"],
-      "known_limitations": ["No production execution controller is implemented in this repository yet."],
-      "validation": {"status": "repository-foundation-only", "tests": null, "date": "2026-10-24", "scope": "Documentation and registry consistency only."}
+      "known_limitations": ["A complete production execution controller and operational control plane are not implemented yet."],
+      "validation": {
+        "status": "repository-foundation-only",
+        "tests": null,
+        "date": "2026-10-24",
+        "scope": "Architecture and registry consistency, not a production service."
+      }
     },
     {
       "id": "delta-decision-infrastructure",
       "name": "Delta-matroid decision infrastructure",
       "type": "decision-engine",
-      "status": "prototype-artifact",
-      "version": "0.5.0",
-      "source": "local-artifact-not-yet-imported",
+      "status": "integrated",
+      "version": "0.6.0",
+      "source": "this-repository",
       "target_path": "modules/decision-infrastructure/",
-      "summary": "Prototype workbench for delta-matroid algorithms, adaptive portfolio scheduling, candidate merging, feasibility checks, and SQLite history.",
-      "capabilities": ["local-search", "signed-greedy", "monotone-path", "guarded-strong-path", "schur-path", "matching-separator", "adaptive-portfolio", "candidate-merging", "sqlite-history", "runtime-guard-primitives"],
+      "summary": "Oracle-driven delta-matroid algorithms, matching and matrix backends, declarative workflow execution, state-aware portfolio scheduling, SQLite run history, and controller-boundary runtime guards.",
+      "capabilities": [
+        "local-search",
+        "signed-greedy",
+        "monotone-path",
+        "guarded-strong-path",
+        "schur-path",
+        "matching-separator",
+        "adaptive-portfolio",
+        "candidate-merging",
+        "sqlite-history",
+        "workflow-dag",
+        "cooperative-cancellation",
+        "input-output-budget-guards"
+      ],
       "known_limitations": [
-        "The v0.5.0 source package has not yet been imported into this repository.",
-        "Runtime budget and cancellation guards are standalone primitives, not enforcement integrated into every controller.",
-        "Cancellation and deadline checks are cooperative and cannot forcibly preempt a blocking capability.",
+        "Cancellation and deadlines are checked cooperatively and cannot forcibly interrupt a blocked capability.",
+        "Serialized byte limits do not enforce CPU or memory quotas.",
+        "SQLite history is not a durable checkpoint/resume or exactly-once side-effect protocol.",
+        "Workflow approval flags are not authenticated identity or an authorization service.",
         "StrongPath must retain the verified-lift condition; parity correction alone is not a universally valid lift.",
-        "Exact matching verification was exercised only on small instances in the prototype."
+        "Exact matching optimum verification uses bounded exhaustive subset enumeration and is intended for small instances.",
+        "No production deployment, security audit, or SLO is claimed."
       ],
       "validation": {
-        "status": "passed-locally",
-        "tests": 53,
+        "status": "ci-passed",
+        "tests": 63,
         "date": "2026-10-24",
-        "scope": "Local v0.5.0 artifact only; not this repository's CI.",
-        "note": "The local suite reported 53 passing tests. This is not evidence of ecosystem-runtime integration."
+        "scope": "GitHub Actions run 40130032418 at commit 9439c0ebcff2901a505adbdf0a6d0434b44c24ce: 59 module tests and 4 repository tests; package compile and wheel build passed.",
+        "note": "Integrated source and tests passed CI. Production runtime, hard isolation, checkpoint recovery, and authenticated action authorization remain outside the current implementation."
       }
     }
   ]
