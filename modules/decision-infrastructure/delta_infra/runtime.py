@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
+import math
 import time
 import uuid
 from types import MappingProxyType
@@ -68,8 +69,8 @@ class ExecutionBudget:
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise RuntimePolicyError(f"{name} must be a positive integer")
         value = self.max_duration_seconds
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
-            raise RuntimePolicyError("max_duration_seconds must be positive")
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+            raise RuntimePolicyError("max_duration_seconds must be a finite positive number")
 
 
 @dataclass
@@ -132,8 +133,8 @@ class RunContext:
         self.policy_snapshot = _freeze_json(_safe_snapshot(self.policy_snapshot, label="policy_snapshot"))
         if not self.trace_id:
             self.trace_id = str(uuid.uuid4())
-        if isinstance(self.elapsed_before_start_seconds, bool) or not isinstance(self.elapsed_before_start_seconds, (int, float)) or self.elapsed_before_start_seconds < 0:
-            raise RuntimePolicyError("elapsed_before_start_seconds must be non-negative")
+        if isinstance(self.elapsed_before_start_seconds, bool) or not isinstance(self.elapsed_before_start_seconds, (int, float)) or not math.isfinite(self.elapsed_before_start_seconds) or self.elapsed_before_start_seconds < 0:
+            raise RuntimePolicyError("elapsed_before_start_seconds must be a finite non-negative number")
 
     def set_policy_snapshot(self, value: Mapping[str, Any]) -> None:
         if self.policy_snapshot:
