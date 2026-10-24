@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import lru_cache
 import hashlib
+import inspect
 import json
 import math
 import sqlite3
@@ -482,6 +483,8 @@ class TaskExecutionController:
         approved_task_ids: Sequence[str] = (),
         budget: ExecutionBudget | None = None,
         cancelled: Callable[[], bool] | None = None,
+        run_context: RunContext | None = None,
+        resume_from_run_id: str | None = None,
     ) -> dict[str, Any]:
         definition = workflow if isinstance(workflow, WorkflowDefinition) else WorkflowDefinition.from_mapping(workflow)
         approved = set(approved_task_ids)
@@ -496,7 +499,6 @@ class TaskExecutionController:
             if task.kind == "builtin" and task.handler not in self.builtin_handlers:
                 raise WorkflowDefinitionError(f"Task {task.id!r} references unknown builtin handler {task.handler!r}")
 
-        guard = RuntimeGuard(budget=budget or ExecutionBudget(), cancelled=cancelled or (lambda: False))
         serialized_workflow = {
             "workflow_id": definition.workflow_id, "description": definition.description,
             "tasks": [
@@ -506,16 +508,133 @@ class TaskExecutionController:
                 for task in definition.tasks
             ],
         }
-        guard.preflight(len(definition.tasks), serialized_workflow)
+        workflow_fingerprint = hashlib.sha256(
+            json.dumps(serialized_workflow, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
 
-        run_id = str(uuid.uuid4())
-        started_at = _utc_now()
+        resume_checkpoint: dict[str, Any] | None = None
+        checkpoint_sequence: int | None = None
+        resumed = resume_from_run_id is not None
+        if resumed:
+            if self.run_store is None:
+                raise WorkflowInputError("resume_from_run_id requires a WorkflowRunStore")
+            if run_context is not None or cancelled is not None or budget is not None:
+                raise WorkflowInputError("Resume restores its saved context and budget; do not supply run_context, cancelled, or budget")
+            latest = self.run_store.get_latest_checkpoint(resume_from_run_id)
+            if latest is None:
+                raise WorkflowInputError(f"No workflow checkpoint exists for run {resume_from_run_id!r}")
+            prior_record = self.run_store.get(resume_from_run_id)
+            if prior_record is not None and prior_record.get("status") == "succeeded":
+                raise WorkflowInputError("A successfully completed workflow cannot be resumed")
+            if latest["workflow_id"] != definition.workflow_id or latest["workflow_fingerprint"] != workflow_fingerprint:
+                raise WorkflowInputError("Cannot resume: workflow ID or canonical workflow definition differs from the checkpoint")
+            resume_checkpoint = latest["checkpoint"]
+            if resume_checkpoint.get("finalized") is True and resume_checkpoint.get("status") == "succeeded":
+                raise WorkflowInputError("A successfully finalized checkpoint cannot be resumed")
+            for task in definition.tasks:
+                if task.kind == "capability":
+                    capability = self.registry.get(task.capability)  # type: ignore[arg-type]
+                    if not capability.retry_safe or capability.side_effect_class not in {"none", "read"}:
+                        raise WorkflowInputError(
+                            f"Cannot resume workflow: capability {capability.name!r} is not declared retry-safe"
+                        )
+                elif task.handler not in {"verify_matching_optimum", "decide_internal_shadow_gate"}:
+                    raise WorkflowInputError(
+                        f"Cannot resume workflow: custom handler {task.handler!r} has no declared retry-safety contract"
+                    )
+            context_data = resume_checkpoint.get("run_context")
+            if not isinstance(context_data, Mapping):
+                raise WorkflowInputError("Checkpoint lacks a valid RunContext snapshot")
+            budget_data = context_data.get("budget")
+            if not isinstance(budget_data, Mapping):
+                raise WorkflowInputError("Checkpoint lacks its execution budget")
+            restored_budget = ExecutionBudget(
+                max_tasks=budget_data["max_tasks"],
+                max_input_bytes=budget_data["max_input_bytes"],
+                max_output_bytes=budget_data["max_output_bytes"],
+                max_duration_seconds=budget_data["max_duration_seconds"],
+            )
+            ledger = BudgetLedger.from_mapping(context_data.get("ledger"))
+            try:
+                elapsed_before_start = float(context_data.get("elapsed_seconds", 0.0))
+            except (TypeError, ValueError) as exc:
+                raise WorkflowInputError("Checkpoint elapsed runtime is invalid") from exc
+            run_context = RunContext.create(
+                budget=restored_budget, cancelled=cancelled, run_id=resume_from_run_id,
+                state_version=context_data.get("state_version", 0),
+                policy_snapshot=context_data.get("policy_snapshot", {}),
+                trace_id=context_data.get("trace_id", ""),
+                parent_run_id=context_data.get("parent_run_id"),
+                ledger=ledger, elapsed_before_start_seconds=elapsed_before_start,
+            )
+            checkpoint_sequence = latest["sequence"]
+        else:
+            if run_context is not None and (budget is not None and run_context.budget != budget):
+                raise WorkflowInputError("budget must match the supplied run_context budget")
+            if run_context is not None and cancelled is not None:
+                raise WorkflowInputError("Pass cancellation through run_context or cancelled, not both")
+            if run_context is None:
+                run_context = RunContext.create(
+                    budget=budget or ExecutionBudget(), cancelled=cancelled,
+                    policy_snapshot={"workflow_id": definition.workflow_id, "workflow_fingerprint": workflow_fingerprint},
+                )
+            else:
+                snapshot = dict(run_context.policy_snapshot)
+                if snapshot.get("workflow_id", definition.workflow_id) != definition.workflow_id:
+                    raise WorkflowInputError("run_context policy snapshot belongs to another workflow")
+                if snapshot.get("workflow_fingerprint", workflow_fingerprint) != workflow_fingerprint:
+                    raise WorkflowInputError("run_context policy snapshot has a different workflow fingerprint")
+                if not snapshot:
+                    run_context.policy_snapshot = {
+                        "workflow_id": definition.workflow_id, "workflow_fingerprint": workflow_fingerprint,
+                    }
+            if self.run_store is not None and self.run_store.get_latest_checkpoint(run_context.run_id) is not None:
+                raise WorkflowInputError("run_context.run_id already has checkpoints; use resume_from_run_id instead")
+            checkpoint_sequence = None
+
+        assert run_context is not None
+        guard = RuntimeGuard(context=run_context)
+        guard.preflight(len(definition.tasks), serialized_workflow)
+        run_id = run_context.run_id
+        started_at = resume_checkpoint.get("started_at", _utc_now()) if resume_checkpoint else _utc_now()
         start_clock = time.perf_counter()
-        task_records: list[dict[str, Any]] = []
-        output_by_id: dict[str, Mapping[str, Any]] = {}
-        status_by_id: dict[str, str] = {}
+        task_records: list[dict[str, Any]] = list(resume_checkpoint.get("task_records", [])) if resume_checkpoint else []
+        output_by_id: dict[str, Mapping[str, Any]] = dict(resume_checkpoint.get("outputs", {})) if resume_checkpoint else {}
+        completed_task_ids: set[str] = set(resume_checkpoint.get("completed_task_ids", [])) if resume_checkpoint else set()
+        if not completed_task_ids <= known_ids:
+            raise WorkflowInputError("Checkpoint contains task IDs that are not part of this workflow")
+        status_by_id: dict[str, str] = {task_id: "succeeded" for task_id in completed_task_ids}
         runtime_stop_status: str | None = None
+
+        def persist_checkpoint(*, status: str = "running", finalized: bool = False) -> None:
+            nonlocal checkpoint_sequence
+            if self.run_store is None:
+                return
+            snapshot = {
+                "schema_version": "1.0",
+                "run_id": run_id,
+                "workflow_id": definition.workflow_id,
+                "workflow_fingerprint": workflow_fingerprint,
+                "started_at": started_at,
+                "status": status,
+                "finalized": finalized,
+                "completed_task_ids": sorted(completed_task_ids),
+                "task_records": task_records,
+                "outputs": output_by_id,
+                "run_context": run_context.checkpoint_metadata(),
+            }
+            checkpoint_sequence = self.run_store.save_checkpoint(
+                run_id=run_id,
+                workflow_id=definition.workflow_id,
+                workflow_fingerprint=workflow_fingerprint,
+                status=status,
+                checkpoint=snapshot,
+                expected_previous_sequence=checkpoint_sequence,
+            )
+
         for task in definition.topological_order():
+            if task.id in completed_task_ids:
+                continue
             task_started = _utc_now()
             task_clock = time.perf_counter()
             failed_dependencies = [dep for dep in task.depends_on if status_by_id.get(dep) != "succeeded"]
@@ -527,6 +646,7 @@ class TaskExecutionController:
                 }
                 task_records.append(record)
                 status_by_id[task.id] = "skipped"
+                persist_checkpoint()
                 continue
             if task.requires_approval and task.id not in approved:
                 record = {
@@ -536,6 +656,7 @@ class TaskExecutionController:
                 }
                 task_records.append(record)
                 status_by_id[task.id] = "approval_required"
+                persist_checkpoint(status="approval_required")
                 continue
             if runtime_stop_status is not None:
                 record = {
@@ -545,15 +666,19 @@ class TaskExecutionController:
                 }
                 task_records.append(record)
                 status_by_id[task.id] = "skipped"
+                persist_checkpoint(status=runtime_stop_status)
                 continue
             try:
-                guard.checkpoint()
                 resolved_inputs = _resolve_references(task.inputs, output_by_id)
-                guard.preflight(len(definition.tasks), {"task_id": task.id, "inputs": resolved_inputs})
+                guard.begin_task({"task_id": task.id, "inputs": resolved_inputs})
                 if task.kind == "capability":
-                    result = self.registry.run(task.capability, resolved_inputs)  # type: ignore[arg-type]
+                    result = self.registry.run(task.capability, resolved_inputs, context=run_context)  # type: ignore[arg-type]
                 else:
-                    result = dict(self.builtin_handlers[task.handler](resolved_inputs))  # type: ignore[index]
+                    handler = self.builtin_handlers[task.handler]  # type: ignore[index]
+                    if "context" in inspect.signature(handler).parameters:
+                        result = dict(handler(resolved_inputs, context=run_context))
+                    else:
+                        result = dict(handler(resolved_inputs))
                 safe_result = _json_safe(dict(result))
                 guard.checkpoint()
                 prospective_outputs = dict(output_by_id)
@@ -568,6 +693,7 @@ class TaskExecutionController:
                 }
                 output_by_id[task.id] = safe_result
                 status_by_id[task.id] = "succeeded"
+                completed_task_ids.add(task.id)
             except ExecutionCancelled as exc:
                 elapsed_ms = round((time.perf_counter() - task_clock) * 1000, 3)
                 record = {
@@ -598,6 +724,7 @@ class TaskExecutionController:
                 }
                 status_by_id[task.id] = "failed"
             task_records.append(record)
+            persist_checkpoint(status="running" if runtime_stop_status is None else runtime_stop_status)
 
         statuses = set(status_by_id.values())
         if runtime_stop_status is not None:
@@ -614,9 +741,14 @@ class TaskExecutionController:
             "schema_version": "1.0", "run_id": run_id,
             "workflow_id": definition.workflow_id, "description": definition.description,
             "status": overall_status, "started_at": started_at, "finished_at": _utc_now(),
-            "duration_ms": round((time.perf_counter() - start_clock) * 1000, 3),
+            "duration_ms": round(run_context.elapsed_seconds * 1000, 3),
             "approved_task_ids": sorted(approved), "tasks": task_records, "outputs": dict(output_by_id),
+            "run_context": run_context.checkpoint_metadata(),
+            "resumed_from_checkpoint": resumed,
+            "workflow_fingerprint": workflow_fingerprint,
         }
         if self.run_store:
+            persist_checkpoint(status=overall_status, finalized=True)
+            record["final_checkpoint_sequence"] = checkpoint_sequence
             self.run_store.save(record)
         return record
