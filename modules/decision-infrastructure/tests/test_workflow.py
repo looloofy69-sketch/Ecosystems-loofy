@@ -3,7 +3,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from delta_infra.workflow import TaskExecutionController, WorkflowDefinition, WorkflowDefinitionError, WorkflowRunStore, verify_matching_optimum
+from delta_infra.workflow import TaskExecutionController, WorkflowDefinition, WorkflowDefinitionError, WorkflowInputError, WorkflowRunStore, verify_matching_optimum
+from delta_infra.registry import Capability, default_registry
 
 ROOT=Path(__file__).resolve().parents[1]
 EXAMPLE=ROOT/"examples"/"workflows"/"internal_matching_validation.json"
@@ -55,5 +56,123 @@ class WorkflowControllerTests(unittest.TestCase):
     def test_independent_verifier_enforces_size_limit(self):
         payload={"vertices":["a","b"],"edges":[["a","b"]],"weights":{"a":1,"b":1},"solution":["a","b"],"reported_objective_value":2,"max_vertices":1}
         with self.assertRaisesRegex(ValueError,"limited to 1 vertices"): verify_matching_optimum(payload)
+
+
+class DurableCheckpointTests(unittest.TestCase):
+    def test_checkpoint_sequence_uses_compare_and_swap(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = WorkflowRunStore(Path(temp) / "runs.sqlite3")
+            first = store.save_checkpoint(
+                run_id="run-cas", workflow_id="flow", workflow_fingerprint="fingerprint",
+                status="running", checkpoint={"step": 1}, expected_previous_sequence=None,
+            )
+            self.assertEqual(first, 1)
+            with self.assertRaises(WorkflowInputError):
+                store.save_checkpoint(
+                    run_id="run-cas", workflow_id="flow", workflow_fingerprint="fingerprint",
+                    status="running", checkpoint={"step": "stale"}, expected_previous_sequence=None,
+                )
+            second = store.save_checkpoint(
+                run_id="run-cas", workflow_id="flow", workflow_fingerprint="fingerprint",
+                status="running", checkpoint={"step": 2}, expected_previous_sequence=1,
+            )
+            self.assertEqual(second, 2)
+            latest = store.get_latest_checkpoint("run-cas")
+            self.assertEqual(latest["sequence"], 2)
+            self.assertEqual(latest["checkpoint"]["step"], 2)
+            self.assertEqual(len(store.list_checkpoints("run-cas")), 2)
+
+    def test_resume_reuses_successful_task_output_and_retries_only_failed_safe_task(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = WorkflowRunStore(Path(temp) / "runs.sqlite3")
+            registry = default_registry()
+            calls = {"stable": 0, "transient": 0}
+
+            def stable(payload, *, context=None):
+                calls["stable"] += 1
+                if context is not None:
+                    context.checkpoint()
+                return {"value": "cached"}
+
+            def transient(payload, *, context=None):
+                calls["transient"] += 1
+                if context is not None:
+                    context.checkpoint()
+                if calls["transient"] == 1:
+                    raise RuntimeError("simulated transient failure")
+                return {"value": payload["input"] + "-recovered"}
+
+            registry.register(Capability(
+                "test.stable", "1.0", "test-only deterministic capability",
+                (), (), stable, side_effect_class="none", retry_safe=True,
+            ))
+            registry.register(Capability(
+                "test.transient", "1.0", "test-only retry-safe capability",
+                (), ("input",), transient, side_effect_class="none", retry_safe=True,
+            ))
+            controller = TaskExecutionController(registry=registry, run_store=store)
+            doc = {
+                "workflow_id": "resume-safe-workflow",
+                "tasks": [
+                    {"id": "prepare", "type": "capability", "capability": "test.stable", "inputs": {}},
+                    {"id": "finish", "type": "capability", "capability": "test.transient",
+                     "depends_on": ["prepare"], "inputs": {"input": {"$ref": "prepare.value"}}},
+                ],
+            }
+            first = controller.run(doc)
+            self.assertEqual(first["status"], "failed")
+            run_id = first["run_id"]
+            self.assertEqual(calls, {"stable": 1, "transient": 1})
+            latest = store.get_latest_checkpoint(run_id)
+            self.assertEqual(latest["checkpoint"]["completed_task_ids"], ["prepare"])
+            self.assertIn("prepare", latest["checkpoint"]["outputs"])
+
+            changed = {**doc, "description": "changed fingerprint"}
+            with self.assertRaisesRegex(WorkflowInputError, "definition differs"):
+                controller.run(changed, resume_from_run_id=run_id)
+            self.assertEqual(calls, {"stable": 1, "transient": 1})
+
+            resumed = controller.run(doc, resume_from_run_id=run_id)
+            self.assertEqual(resumed["status"], "succeeded")
+            self.assertTrue(resumed["resumed_from_checkpoint"])
+            self.assertEqual(calls, {"stable": 1, "transient": 2})
+            self.assertEqual(resumed["outputs"]["prepare"]["value"], "cached")
+            self.assertEqual(resumed["outputs"]["finish"]["value"], "cached-recovered")
+            self.assertEqual(resumed["run_id"], run_id)
+            self.assertGreaterEqual(len(store.list_checkpoints(run_id)), 5)
+
+    def test_successfully_completed_workflow_cannot_be_resumed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = WorkflowRunStore(Path(temp) / "runs.sqlite3")
+            doc = {
+                "workflow_id": "completed-resume-test",
+                "tasks": [{
+                    "id": "gate", "type": "builtin", "handler": "decide_internal_shadow_gate",
+                    "inputs": {"optimization": {"member_verified": True}, "verification": {"verified_optimal": True}},
+                }],
+            }
+            controller = TaskExecutionController(run_store=store)
+            result = controller.run(doc)
+            self.assertEqual(result["status"], "succeeded")
+            with self.assertRaisesRegex(WorkflowInputError, "successfully completed"):
+                controller.run(doc, resume_from_run_id=result["run_id"])
+
+    def test_resume_refuses_capability_without_retry_safe_contract(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = WorkflowRunStore(Path(temp) / "runs.sqlite3")
+            registry = default_registry()
+            registry.register(Capability(
+                "test.unsafe", "1.0", "not marked retry-safe", (), (),
+                lambda payload: {"ok": True}, side_effect_class="external", retry_safe=False,
+            ))
+            controller = TaskExecutionController(registry=registry, run_store=store)
+            doc = {"workflow_id": "unsafe-resume-test", "tasks": [
+                {"id": "unsafe", "type": "capability", "capability": "test.unsafe", "inputs": {}},
+            ]}
+            first = controller.run(doc)
+            self.assertEqual(first["status"], "succeeded")
+            with self.assertRaisesRegex(WorkflowInputError, "successfully completed"):
+                controller.run(doc, resume_from_run_id=first["run_id"])
+
 
 if __name__=="__main__": unittest.main()
