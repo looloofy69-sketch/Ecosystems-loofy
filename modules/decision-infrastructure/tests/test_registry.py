@@ -1,5 +1,6 @@
 import unittest
 from delta_infra.registry import default_registry
+from delta_infra.runtime import ExecutionCancelled, RunContext
 
 class RegistryTests(unittest.TestCase):
     def test_registry_lists_and_runs_capability(self):
@@ -32,6 +33,19 @@ class RegistryTests(unittest.TestCase):
         self.assertTrue(matrix["complete"])
         separator = registry.run("matching.separation", {"vertices": ["a", "b"], "edges": [["a", "b"]], "S": ["a", "b"], "T": []})
         self.assertTrue(separator["feasible"])
+    def test_run_context_cancels_inside_explicit_family_exchange_validation(self):
+        calls = {"count": 0}
+        def cancel_during_validation():
+            calls["count"] += 1
+            return calls["count"] >= 5
+        context = RunContext.create(cancelled=cancel_during_validation)
+        E = ["a", "b", "c", "d"]
+        family = [[], ["a", "b"], ["a", "c"], ["a", "d"], ["b", "c"], ["b", "d"], ["c", "d"], ["a", "b", "c", "d"]]
+        payload = {"ground_set": E, "feasible_sets": family, "weights": {"a": 5, "b": -3, "c": 4, "d": 2}}
+        with self.assertRaises(ExecutionCancelled):
+            default_registry().run("delta_matroid.signed_greedy", payload, context=context)
+        self.assertGreaterEqual(calls["count"], 5)
+
     def test_missing_inputs_are_rejected(self):
         with self.assertRaises(ValueError):
             default_registry().run("matching.signed_greedy", {"vertices": []})
