@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Hashable, Iterable, Mapping
+from typing import Any, Callable, Hashable, Iterable, Mapping
 
 try:
     import networkx as nx
@@ -71,7 +71,7 @@ class MatchingDeltaMatroid:
         return self.member(candidate)
 
 
-def matching_separate(vertices: Iterable[Vertex], edges: Iterable[Edge], S: Iterable[Vertex], T: Iterable[Vertex]) -> MatchingSepResult:
+def matching_separate(vertices: Iterable[Vertex], edges: Iterable[Edge], S: Iterable[Vertex], T: Iterable[Vertex], *, checkpoint: Callable[[], None] | None = None) -> MatchingSepResult:
     """Algorithm 5 using maximum-weight matching in an arbitrary simple graph.
 
     Returns True iff there is a feasible induced vertex subset F with S⊆F and
@@ -93,7 +93,11 @@ def matching_separate(vertices: Iterable[Vertex], edges: Iterable[Edge], S: Iter
     for u, v in E:
         if u in H_vertices and v in H_vertices:
             H.add_edge(u, v, weight=int(u in Sset) + int(v in Sset))
+    if checkpoint is not None:
+        checkpoint()
     raw_matching = nx.max_weight_matching(H, maxcardinality=False, weight="weight")
+    if checkpoint is not None:
+        checkpoint()
     vertex_order = {v: i for i, v in enumerate(V)}
     matching: list[Edge] = []
     covered: set[Vertex] = set()
@@ -115,6 +119,8 @@ def signed_greedy_matching_delta_matroid(
     vertices: Iterable[Vertex],
     edges: Iterable[Edge],
     weights: Mapping[Vertex, int | float],
+    *,
+    checkpoint: Callable[[], None] | None = None,
 ) -> dict[str, Any]:
     """Run Algorithm 2 over the matching delta-matroid without enumerating sets."""
     from .algorithms import signed_greedy
@@ -125,7 +131,9 @@ def signed_greedy_matching_delta_matroid(
     vertex_order = {v: i for i, v in enumerate(system.vertices)}
     ordered = lambda values: sorted(values, key=vertex_order.__getitem__)
     def audited_separator(include, exclude):
-        diagnostic = matching_separate(system.vertices, system.edges, include, exclude)
+        if checkpoint is not None:
+            checkpoint()
+        diagnostic = matching_separate(system.vertices, system.edges, include, exclude, checkpoint=checkpoint)
         query_index = len(separator_trace) + 1
         phase = "greedy_decision" if query_index <= len(system.vertices) else "final_feasibility_verification"
         separator_trace.append({
@@ -138,7 +146,7 @@ def signed_greedy_matching_delta_matroid(
             "witness_feasible_set": ordered(diagnostic.witness_feasible_set),
         })
         return diagnostic.feasible
-    result = signed_greedy(system.vertices, weights, audited_separator, verify_result=True)
+    result = signed_greedy(system.vertices, weights, audited_separator, verify_result=True, checkpoint=checkpoint)
     member_verified = system.member(result.solution)
     if not member_verified:
         raise RuntimeError("Postcondition failed: returned set has no induced perfect matching")
