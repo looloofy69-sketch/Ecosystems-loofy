@@ -6,7 +6,8 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from .workflow import TaskExecutionController, WorkflowRunStore
+from .runtime import ExecutionBudgetExceeded, RuntimePolicyError
+from .workflow import TaskExecutionController, WorkflowDefinitionError, WorkflowInputError, WorkflowRunStore
 
 
 def main() -> None:
@@ -43,10 +44,14 @@ def main() -> None:
         except json.JSONDecodeError as exc:
             parser.error(f"Invalid workflow JSON: {exc}")
         controller = TaskExecutionController(run_store=store)
-        if args.resume:
-            output = controller.run(workflow, approved_task_ids=args.approve, resume_from_run_id=args.resume)
-        else:
-            output = controller.run(workflow, approved_task_ids=args.approve)
+        try:
+            if args.resume:
+                output = controller.run(workflow, approved_task_ids=args.approve, resume_from_run_id=args.resume)
+            else:
+                output = controller.run(workflow, approved_task_ids=args.approve)
+        except (WorkflowDefinitionError, WorkflowInputError, ExecutionBudgetExceeded, RuntimePolicyError) as exc:
+            print(f"workflow error: {exc}", file=sys.stderr)
+            raise SystemExit(2) from exc
     print(json.dumps(output, indent=2 if args.pretty else None, ensure_ascii=False, allow_nan=False, default=str))
     if isinstance(output, dict) and output.get("status") in {"failed", "blocked"}:
         raise SystemExit(1)
