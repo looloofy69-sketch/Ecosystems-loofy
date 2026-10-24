@@ -362,7 +362,11 @@ def strong_path_explicit(
         raise ValueError("Both endpoints must be feasible")
 
     lift_function = lift if lift is not None else (lambda X: parity_correcting_lift(X, dummy=dummy))
-    lifted_list = [frozenset(lift_function(F)) for F in original.feasible_sets]
+    lifted_list = []
+    for feasible_set in original.feasible_sets:
+        if checkpoint is not None:
+            checkpoint()
+        lifted_list.append(frozenset(lift_function(feasible_set)))
     if len(set(lifted_list)) != len(lifted_list):
         raise ValueError("Lift is not injective over the feasible family")
     if len({len(F) % 2 for F in lifted_list}) != 1:
@@ -371,7 +375,7 @@ def strong_path_explicit(
     lift_oracle = ExplicitFamilyOracle(tuple(E) + (dummy,), lifted_family)
     if checkpoint is not None:
         checkpoint()
-    if not lift_oracle.is_delta_matroid():
+    if not lift_oracle.is_delta_matroid(checkpoint=checkpoint):
         raise ValueError("StrongPath precondition failed: lifted family violates symmetric exchange")
     if not lift_oracle.is_even():
         raise ValueError("StrongPath precondition failed: lifted family is not even")
