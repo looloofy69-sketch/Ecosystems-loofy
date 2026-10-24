@@ -498,6 +498,17 @@ class TaskExecutionController:
         for task in definition.tasks:
             if task.kind == "capability" and task.capability not in available:
                 raise WorkflowDefinitionError(f"Task {task.id!r} references unknown capability {task.capability!r}")
+            if task.kind == "capability":
+                capability = self.registry.get(task.capability)  # type: ignore[arg-type]
+                if capability.side_effect_class == "unknown":
+                    raise WorkflowDefinitionError(
+                        f"Task {task.id!r}: capability {capability.name!r} has unknown side-effect classification"
+                    )
+                if capability.side_effect_class in {"write", "external"} and not task.requires_approval:
+                    raise WorkflowDefinitionError(
+                        f"Task {task.id!r}: capability {capability.name!r} with {capability.side_effect_class!r} "
+                        "effects must declare requires_approval=true"
+                    )
             if task.kind == "builtin" and task.handler not in self.builtin_handlers:
                 raise WorkflowDefinitionError(f"Task {task.id!r} references unknown builtin handler {task.handler!r}")
 
