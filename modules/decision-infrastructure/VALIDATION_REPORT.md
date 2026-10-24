@@ -1,26 +1,25 @@
 # Validation report — Delta-Infrastructure 0.6.0
 
+## Verified CI result
+
+- **Workflow:** [Repository validation, run 40130032418](https://github.com/looloofy69-sketch/Ecosystems-loofy/actions/runs/40130032418)
+- **Validated commit:** `9439c0ebcff2901a505adbdf0a6d0434b44c24ce`
+- **Conclusion:** success
+- **Steps passed:** registry/Markdown consistency, root repository tests, editable package installation, package compileall, decision-module tests, wheel build.
+- **Test count:** 59 tests in the decision-module suite and 4 tests in repository tooling; both test steps passed.
+- **Build:** Python wheel build passed in CI.
+
+The validated revision includes the imported package, package tests, examples and runtime integration test suite. Subsequent edits to registry and documentation do not change the package source; the workflow reruns for each push to main.
+
 ## Scope
 
-Source is imported under modules/decision-infrastructure. The test suite covers oracle-based algorithms, exhaustive small mathematical instances, matching separation/optimization against independent definitions, Schur-pivot exactness, portfolio scheduling and transition contracts, workflow validation/persistence, runtime guard primitives, and controller-boundary enforcement.
+The package suite covers oracle-based algorithms, exhaustive small mathematical instances, matching separation/optimization against independent definitions, Schur-pivot exactness, portfolio scheduling and transition contracts, workflow validation/persistence, runtime guard primitives, and controller-boundary enforcement.
 
-## Local artifact baseline
+## Limits
 
-Before import, the local v0.6.0 workbench suite reported 59 passing tests using:
-
-    python -m unittest discover -s tests -v
-
-That local result is baseline evidence for the workbench folder, not evidence about the GitHub revision.
-
-## Repository validation
-
-The GitHub Actions run for the imported revision is authoritative. It should run repository registry/link checks, root tests, package tests, and a wheel build. Record the actual run URL, commit SHA, result, and test count after the run finishes; do not copy local totals into the CI result.
-
-## Known limitations
-
-- Guards observe cancellation/deadline only at cooperative boundaries; blocking code is not forcefully terminated.
+- Cancellation/deadline checks are cooperative; blocking code is not forcibly terminated.
 - Serialized size limits do not replace process-level CPU/memory quotas.
 - SQLite history is not a checkpoint-and-resume or exactly-once side-effect protocol.
-- Workflow approval flags do not provide authenticated identity, role-based access control, or cryptographic audit.
+- Workflow approval flags do not provide authenticated identity, RBAC, or cryptographic audit.
 - Matching optimum verification is bounded exhaustive verification for small instances.
 - No production deployment, security audit, or SLO has been claimed.
