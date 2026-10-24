@@ -147,7 +147,11 @@ def signed_greedy_matching_delta_matroid(
         })
         return diagnostic.feasible
     result = signed_greedy(system.vertices, weights, audited_separator, verify_result=True, checkpoint=checkpoint)
+    if checkpoint is not None:
+        checkpoint()
     member_verified = system.member(result.solution)
+    if checkpoint is not None:
+        checkpoint()
     if not member_verified:
         raise RuntimeError("Postcondition failed: returned set has no induced perfect matching")
     return {
