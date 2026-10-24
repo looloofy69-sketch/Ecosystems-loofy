@@ -7,7 +7,10 @@ mathematical model fits a task; handlers validate the relevant preconditions.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import inspect
 from typing import Any, Callable, Mapping
+
+from .runtime import RunContext
 
 
 @dataclass(frozen=True)
@@ -17,7 +20,18 @@ class Capability:
     purpose: str
     preconditions: tuple[str, ...]
     input_keys: tuple[str, ...]
-    handler: Callable[[Mapping[str, Any]], Mapping[str, Any]]
+    handler: Callable[..., Mapping[str, Any]]
+    side_effect_class: str = "unknown"
+    retry_safe: bool = False
+
+    def __post_init__(self) -> None:
+        allowed = {"none", "read", "write", "external", "unknown"}
+        if self.side_effect_class not in allowed:
+            raise ValueError(f"side_effect_class must be one of {sorted(allowed)}")
+        if not isinstance(self.retry_safe, bool):
+            raise ValueError("retry_safe must be boolean")
+        if self.retry_safe and self.side_effect_class not in {"none", "read"}:
+            raise ValueError("Only side-effect-free/read-only capabilities may declare retry_safe=True")
 
 
 class CapabilityRegistry:
@@ -32,20 +46,37 @@ class CapabilityRegistry:
     def describe(self) -> list[dict[str, Any]]:
         return [
             {"name": c.name, "version": c.version, "purpose": c.purpose,
-             "preconditions": list(c.preconditions), "input_keys": list(c.input_keys)}
+             "preconditions": list(c.preconditions), "input_keys": list(c.input_keys),
+             "side_effect_class": c.side_effect_class, "retry_safe": c.retry_safe}
             for c in sorted(self._capabilities.values(), key=lambda item: item.name)
         ]
 
-    def run(self, name: str, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+    def get(self, name: str) -> Capability:
         try:
-            capability = self._capabilities[name]
+            return self._capabilities[name]
         except KeyError as exc:
             raise KeyError(f"Unknown capability {name!r}; available: {sorted(self._capabilities)}") from exc
+
+    def run(
+        self, name: str, payload: Mapping[str, Any], *, context: RunContext | None = None
+    ) -> Mapping[str, Any]:
+        capability = self.get(name)
         missing = set(capability.input_keys) - set(payload)
         if missing:
             raise ValueError(f"Capability {name!r} is missing inputs: {sorted(missing)}")
-        result = dict(capability.handler(payload))
-        result["capability"] = {"name": capability.name, "version": capability.version}
+        if context is not None:
+            context.checkpoint()
+        parameters = inspect.signature(capability.handler).parameters
+        if context is not None and "context" in parameters:
+            result = dict(capability.handler(payload, context=context))
+        else:
+            result = dict(capability.handler(payload))
+        if context is not None:
+            context.checkpoint()
+        result["capability"] = {
+            "name": capability.name, "version": capability.version,
+            "side_effect_class": capability.side_effect_class,
+        }
         return result
 
 
@@ -110,13 +141,13 @@ def _register_explicit_optimization(registry: CapabilityRegistry) -> None:
         "delta_matroid.local_search", "0.3.0",
         "Best-improvement optimization using one- and two-element flips.",
         ("Explicit feasible family satisfies symmetric exchange.", "Initial set is feasible.", "Objective is additive with finite real weights."),
-        ("ground_set", "feasible_sets", "weights", "initial"), run_local_search,
+        ("ground_set", "feasible_sets", "weights", "initial"), run_local_search, side_effect_class="none", retry_safe=True,
     ))
     registry.register(Capability(
         "delta_matroid.signed_greedy", "0.3.0",
         "Signed greedy optimization using a set-system separation oracle.",
         ("Explicit feasible family satisfies symmetric exchange.", "Weights are finite real values."),
-        ("ground_set", "feasible_sets", "weights"), run_signed_greedy,
+        ("ground_set", "feasible_sets", "weights"), run_signed_greedy, side_effect_class="none", retry_safe=True,
     ))
 
 
@@ -151,13 +182,13 @@ def _register_path_capabilities(registry: CapabilityRegistry) -> None:
         "delta_matroid.monotone_path", "0.3.0",
         "Construct a distance-decreasing feasible path in an even delta-matroid.",
         ("Explicit feasible family satisfies symmetric exchange and uniform parity.", "Both endpoints are feasible."),
-        ("ground_set", "feasible_sets", "A", "B"), run_monotone_path,
+        ("ground_set", "feasible_sets", "A", "B"), run_monotone_path, side_effect_class="none", retry_safe=True,
     ))
     registry.register(Capability(
         "delta_matroid.strong_path", "0.3.0",
         "Validate a candidate lift and construct a path only if the lifted system is an even delta-matroid.",
         ("Explicit original family is a delta-matroid.", "Lift is injective, even, and satisfies symmetric exchange."),
-        ("ground_set", "feasible_sets", "A", "B"), run_strong_path,
+        ("ground_set", "feasible_sets", "A", "B"), run_strong_path, side_effect_class="none", retry_safe=True,
     ))
 
 
@@ -187,7 +218,7 @@ def _register_matrix_capability(registry: CapabilityRegistry) -> None:
     registry.register(Capability(
         "delta_matroid.schur_path", "0.3.0",
         "Build a sequence of nonsingular principal prefixes using 2x2 Schur pivots.",
-        ("Matrix is square and alternating over the selected exact field.",), ("matrix",), run_schur,
+        ("Matrix is square and alternating over the selected exact field.",), ("matrix",), run_schur, side_effect_class="none", retry_safe=True,
     ))
 
 
@@ -213,13 +244,13 @@ def _register_matching_capabilities(registry: CapabilityRegistry) -> None:
         "matching.separation", "0.3.0",
         "Answer a matching-delta-matroid separability query with a maximum-weight matching witness.",
         ("Finite simple undirected graph.", "S and T are disjoint vertex subsets."),
-        ("vertices", "edges", "S", "T"), run_match_sep,
+        ("vertices", "edges", "S", "T"), run_match_sep, side_effect_class="none", retry_safe=True,
     ))
     registry.register(Capability(
         "matching.signed_greedy", "0.3.0",
         "Maximize additive vertex weights over vertex sets whose induced subgraph has a perfect matching.",
         ("Finite simple undirected graph.", "Every vertex has a finite real weight."),
-        ("vertices", "edges", "weights"), run_matching_greedy,
+        ("vertices", "edges", "weights"), run_matching_greedy, side_effect_class="none", retry_safe=True,
     ))
 
 
