@@ -64,6 +64,7 @@ def local_search(
     membership_oracle: MembershipOracleProtocol,
     *,
     max_improving_moves: int | None = None,
+    checkpoint: Callable[[], None] | None = None,
 ) -> LocalSearchResult:
     """Algorithm 1: best-improvement search over all one/two-element flips."""
     E = _validate_ground_set(ground_set)
@@ -89,6 +90,8 @@ def local_search(
         for r in (1, 2):
             from itertools import combinations
             for U_tuple in combinations(E, r):
+                if checkpoint is not None:
+                    checkpoint()
                 candidate = X ^ frozenset(U_tuple)
                 queries += 1
                 feasible = bool(membership_oracle(candidate))
@@ -134,6 +137,7 @@ def signed_greedy(
     separation_oracle: SeparationOracleProtocol,
     *,
     verify_result: bool = True,
+    checkpoint: Callable[[], None] | None = None,
 ) -> SignedGreedyResult:
     """Algorithm 2 using a set-system separation oracle."""
     E = _validate_ground_set(ground_set)
@@ -148,6 +152,8 @@ def signed_greedy(
     queries = 0
 
     for e in order:
+        if checkpoint is not None:
+            checkpoint()
         accepted = bool(twisted_oracle(S | {e}, T))
         queries += 1
         if accepted:
@@ -164,6 +170,8 @@ def signed_greedy(
     verification_queries = 0
     verified: bool | None = None
     if verify_result:
+        if checkpoint is not None:
+            checkpoint()
         verification_queries = 1
         verified = bool(separation_oracle(result, frozenset(E) - result))
         if not verified:
@@ -200,6 +208,7 @@ def monotone_path(
     membership_oracle: MembershipOracleProtocol,
     *,
     assume_even_delta_matroid: bool = False,
+    checkpoint: Callable[[], None] | None = None,
 ) -> MonotonePathResult:
     """Algorithm 3; callers must establish the even-delta-matroid precondition."""
     if not assume_even_delta_matroid:
@@ -226,11 +235,15 @@ def monotone_path(
     trace = [{"event": "start", "A": show(X), "B": show(target), "distance": len(X ^ target)}]
     exchange_queries = 0
     while X != target:
+        if checkpoint is not None:
+            checkpoint()
         delta = X ^ target
         x = min(delta, key=rank.__getitem__)
         found = False
         candidates = sorted(delta - {x}, key=rank.__getitem__)
         for y in candidates:
+            if checkpoint is not None:
+                checkpoint()
             candidate = X ^ frozenset((x, y))
             exchange_queries += 1
             if membership_oracle(candidate):
@@ -296,6 +309,7 @@ def strong_path_oracle(
     result = monotone_path(
         lifted_E, lifted_A, lifted_B, lifted_membership_oracle,
         assume_even_delta_matroid=True,
+        checkpoint=checkpoint,
     )
     projected = [frozenset(project(state)) for state in result.path]
     if projected[0] != A_set or projected[-1] != B_set:
@@ -332,12 +346,15 @@ def strong_path_explicit(
     *,
     dummy: Element = "*",
     lift: Callable[[Iterable[Element]], Iterable[Element]] | None = None,
+    checkpoint: Callable[[], None] | None = None,
 ) -> StrongPathResult:
     """Algorithm 3' for explicit families with lift precondition verification."""
     E = _validate_ground_set(ground_set)
     if dummy in E:
         raise ValueError("Dummy element must be outside the original ground set")
     original = ExplicitFamilyOracle(E, feasible_sets)
+    if checkpoint is not None:
+        checkpoint()
     original.verify_delta_matroid()
     A_set, B_set = frozenset(A), frozenset(B)
     if A_set not in original.feasible_sets or B_set not in original.feasible_sets:
@@ -351,6 +368,8 @@ def strong_path_explicit(
         raise ValueError("Lifted family does not have uniform parity")
     lifted_family = frozenset(lifted_list)
     lift_oracle = ExplicitFamilyOracle(tuple(E) + (dummy,), lifted_family)
+    if checkpoint is not None:
+        checkpoint()
     if not lift_oracle.is_delta_matroid():
         raise ValueError("StrongPath precondition failed: lifted family violates symmetric exchange")
     if not lift_oracle.is_even():
