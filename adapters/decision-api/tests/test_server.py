@@ -117,6 +117,14 @@ class DecisionApiTests(unittest.TestCase):
         self.assertEqual(nonfinite.status_code, 400)
         self.assertEqual(nonfinite.json()["status"], "rejected")
 
+        duplicate = self.client.post(
+            "/v1/run",
+            headers={**self.auth(), "Content-Type": "application/json"},
+            content=b'{"capability_id":"matching.signed_greedy","capability_id":"shell.execute","input":{}}',
+        )
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertEqual(duplicate.json()["status"], "rejected")
+
     def test_oversized_streamed_body_is_rejected(self):
         body = b"x" * (MAX_REQUEST_BODY_BYTES + 1)
         response = self.client.post(
