@@ -26,8 +26,8 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(component["version"], "0.8.0")
         self.assertEqual(component["source"], "this-repository")
         self.assertEqual(component["validation"]["status"], "ci-passed")
-        self.assertEqual(component["validation"]["tests"], 77)
-        self.assertIn("40150302288", component["validation"]["scope"])
+        self.assertEqual(component["validation"]["tests"], 80)
+        self.assertIn("40150460695", component["validation"]["scope"])
         self.assertTrue(component["known_limitations"])
         self.assertTrue(any("cannot forcibly interrupt" in item for item in component["known_limitations"]))
 
