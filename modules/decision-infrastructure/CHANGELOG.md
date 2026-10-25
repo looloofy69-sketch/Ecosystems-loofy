@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0 — Portfolio checkpoint and resume
+
+- Added explicit strategy version and `retry_safe` metadata; retry safety defaults to false.
+- Added append-only SQLite portfolio-turn checkpoints carrying committed state, turn history, scheduler cursors, strategy counters, disabled-strategy set, and run-context budget metadata.
+- Added resume by run ID for portfolios whose strategies all explicitly declare retry safety.
+- Bound recovery to a canonical fingerprint of the initial state, mode, failure policy, and versioned strategy catalog; changed catalogs are rejected.
+- Added regression tests for resume behavior, changed strategy fingerprints, and rejection of unsafe strategies.
+- Limits: retry safety is a trusted declaration, not a proof; crash recovery may replay the last turn from the previous checkpoint; arbitrary side effects and exactly-once execution are not supported.
+
+
 ## 0.7.0 — Shared execution context and workflow recovery
 
 - Added a typed RunContext with an immutable JSON policy snapshot, trace/run identity, shared deadline/cancellation callback, and centrally accounted budget ledger.
