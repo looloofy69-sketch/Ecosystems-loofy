@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "repository": "looloofy69-sketch/Ecosystems-loofy",
   "stage": "integration",
-  "updated_at": "2026-10-24",
+  "updated_at": "2026-10-25",
   "components": [
     {
       "id": "ecosystem-control-plane",
@@ -13,8 +13,15 @@
       "source": "this-repository",
       "target_path": "docs/architecture/",
       "summary": "Defines run context, policy boundaries, component lifecycle, orchestration, and evidence requirements.",
-      "capabilities": ["component-registry", "execution-contract", "governance", "quality-gates"],
-      "known_limitations": ["A complete production execution controller and operational control plane are not implemented yet."],
+      "capabilities": [
+        "component-registry",
+        "execution-contract",
+        "governance",
+        "quality-gates"
+      ],
+      "known_limitations": [
+        "A complete production execution controller and operational control plane are not implemented yet."
+      ],
       "validation": {
         "status": "repository-foundation-only",
         "tests": null,
@@ -27,10 +34,10 @@
       "name": "Delta-matroid decision infrastructure",
       "type": "decision-engine",
       "status": "integrated",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "source": "this-repository",
       "target_path": "modules/decision-infrastructure/",
-      "summary": "Oracle-driven delta-matroid algorithms, matching and matrix backends, declarative workflow execution, adaptive portfolio scheduling, shared run context, SQLite task checkpoints, and bounded recovery for retry-safe workflows.",
+      "summary": "Oracle-driven delta-matroid algorithms, matching and matrix backends, declarative workflow execution, adaptive portfolio scheduling, shared run context, and SQLite checkpoint/recovery for retry-safe workflows and portfolio turns.",
       "capabilities": [
         "local-search",
         "signed-greedy",
@@ -46,24 +53,28 @@
         "cooperative-cancellation",
         "input-output-budget-guards",
         "sqlite-checkpoint-resume",
-        "side-effect-approval-gate"
+        "side-effect-approval-gate",
+        "portfolio-checkpoint-resume",
+        "strategy-version-fingerprints",
+        "retry-safety-contracts"
       ],
       "known_limitations": [
         "Cancellation and deadlines are cooperative and cannot forcibly interrupt a blocked capability.",
         "Serialized byte limits do not enforce CPU or memory quotas.",
         "SQLite checkpoints recover declarative workflows only for retry-safe capabilities; they are not an external transaction log or exactly-once side-effect protocol.",
         "Workflow approval flags are not authenticated identity or a full authorization service.",
-        "Portfolio state is not yet restart-resumable from per-turn checkpoints.",
         "StrongPath must retain the verified-lift condition; parity correction alone is not a universally valid lift.",
         "Exact matching optimum verification uses bounded exhaustive subset enumeration and is intended for small instances.",
-        "No production deployment, security audit, or SLO is claimed."
+        "No production deployment, security audit, or SLO is claimed.",
+        "Portfolio recovery is available only when every registered strategy explicitly declares retry_safe=true; the declaration is trusted, not proven.",
+        "Portfolio recovery can replay the last turn from the previous pre-turn checkpoint and does not guarantee exactly-once side effects."
       ],
       "validation": {
         "status": "ci-passed",
-        "tests": 74,
-        "date": "2026-10-24",
-        "scope": "GitHub Actions run 40133079284 at commit 153ae59a629ebdc3a4a2cbcbd8bff1c5943c9693: 70 module tests and 4 repository tests; registry/link checks, package install, compileall, CLI smoke tests, and wheel build passed.",
-        "note": "This supports integrated status only. Hard isolation, authenticated authorization, authoritative state compare-and-swap, portfolio checkpoint recovery, and production operations remain incomplete."
+        "tests": 77,
+        "date": "2026-10-25",
+        "scope": "GitHub Actions run 40150302288 at commit b95724360eb3cf3983f38b3229e6c01accec88cc: 73 decision-module tests and 4 repository tests; registry/link checks, package install, compileall, CLI smoke tests, and wheel build passed.",
+        "note": "The package now includes retry-safe portfolio checkpoint/resume. Hard isolation, authenticated authorization, authoritative state compare-and-swap, and production operations remain incomplete."
       }
     }
   ]
