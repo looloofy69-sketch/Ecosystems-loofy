@@ -128,4 +128,84 @@ class PortfolioSchedulingTests(unittest.TestCase):
         state["scheduler_mode"]="shape-driven"; self.assertEqual(controller.run(state,mode="auto")["status"],"completed")
         with self.assertRaises(PortfolioDefinitionError): controller.run(state,mode="teleport")
 
+
+    def test_portfolio_checkpoints_and_resumes_only_retry_safe_strategies(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            store = WorkflowRunStore(Path(temporary) / "runs.sqlite3")
+            catalog = StrategyCatalog()
+
+            def increment(state):
+                nxt = dict(state)
+                nxt["counter"] = int(state.get("counter", 0)) + 1
+                nxt["log"] = [*state.get("log", []), "increment"]
+                nxt["done"] = nxt["counter"] >= state.get("limit", 99)
+                return StrategyTurn("progress", nxt)
+
+            catalog.register(AlgorithmStrategy(
+                "increment", "deterministic", increment, retry_safe=True, version="test-1",
+            ))
+            controller = PortfolioController(catalog, run_store=store)
+            initial = {"counter": 0, "limit": 99, "log": []}
+            first = controller.run(initial, mode="rotation", max_turns=1)
+            self.assertEqual(first["status"], "turn_limit_reached")
+            run_id = first["run_id"]
+            self.assertEqual(first["final_state"]["counter"], 1)
+            checkpoint = store.get_latest_checkpoint(run_id)
+            self.assertEqual(checkpoint["checkpoint"]["kind"], "portfolio-turn-checkpoint")
+            self.assertEqual(checkpoint["checkpoint"]["next_turn_index"], 0)
+
+            resumed = controller.run(
+                initial, mode="rotation", max_turns=2, resume_from_run_id=run_id,
+            )
+            self.assertEqual(resumed["run_id"], run_id)
+            self.assertEqual(resumed["status"], "turn_limit_reached")
+            self.assertEqual(resumed["final_state"]["counter"], 2)
+            self.assertEqual(resumed["final_state"]["log"], ["increment", "increment"])
+            self.assertEqual(resumed["turn_count"], 2)
+            self.assertGreaterEqual(len(store.list_checkpoints(run_id)), 3)
+
+    def test_portfolio_resume_rejects_non_retry_safe_strategy(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            store = WorkflowRunStore(Path(temporary) / "runs.sqlite3")
+            catalog = StrategyCatalog()
+            catalog.register(stepping_strategy("not-safe", "demo"))
+            controller = PortfolioController(catalog, run_store=store)
+            with self.assertRaisesRegex(PortfolioDefinitionError, "retry_safe=true"):
+                controller.run(
+                    {"counter": 0, "limit": 99, "log": []},
+                    mode="rotation", max_turns=2, resume_from_run_id="missing",
+                )
+
+    def test_portfolio_resume_rejects_changed_strategy_fingerprint(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            store = WorkflowRunStore(Path(temporary) / "runs.sqlite3")
+
+            def increment(state):
+                nxt = dict(state)
+                nxt["counter"] = int(state.get("counter", 0)) + 1
+                nxt["log"] = [*state.get("log", []), "increment"]
+                nxt["done"] = False
+                return StrategyTurn("progress", nxt)
+
+            initial = {"counter": 0, "log": []}
+            first_catalog = StrategyCatalog()
+            first_catalog.register(AlgorithmStrategy(
+                "increment", "deterministic", increment, retry_safe=True, version="test-1",
+            ))
+            first = PortfolioController(first_catalog, run_store=store).run(
+                initial, mode="rotation", max_turns=1,
+            )
+            changed_catalog = StrategyCatalog()
+            changed_catalog.register(AlgorithmStrategy(
+                "increment", "deterministic", increment, retry_safe=True, version="test-2",
+            ))
+            with self.assertRaisesRegex(PortfolioDefinitionError, "differs from the checkpoint"):
+                PortfolioController(changed_catalog, run_store=store).run(
+                    initial, mode="rotation", max_turns=2, resume_from_run_id=first["run_id"],
+                )
+
+
 if __name__=="__main__": unittest.main()
