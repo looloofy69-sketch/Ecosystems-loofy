@@ -80,7 +80,7 @@ docker run --rm -p 127.0.0.1:8080:8080 \
   ecosystem-decision-api:local
 ```
 
-The Docker image does not contain a credential. Do not publish or expose the port publicly unless TLS ingress, secret injection, monitoring, quotas, and deployment rollback are configured.
+The container runs as a non-root user and the image does not contain a credential. Do not publish or expose the port publicly unless TLS ingress, secret injection, monitoring, quotas, and deployment rollback are configured.
 
 ## Connecting to EL-Rouji
 
