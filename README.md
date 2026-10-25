@@ -8,6 +8,7 @@ An internal, modular control plane for coordinating decision algorithms and tool
 
     .
     ├── adapters/
+    │   ├── decision-api/            # Authenticated HTTP bridge prototype for server-to-server calls
     │   └── decision-mcp/            # Bounded, read-only MCP server for pure algorithms
     ├── ecosystem/                   # Component registry and maturity records
     ├── docs/
@@ -52,6 +53,7 @@ A listed repository is not automatically an integrated component. The MCP adapte
 - [Implementation roadmap](docs/roadmap/ROADMAP.md)
 - [Decision module README](modules/decision-infrastructure/README.md)
 - [Decision MCP adapter](adapters/decision-mcp/README.md)
+- [Authenticated Decision API bridge](adapters/decision-api/README.md)
 - [Component registry](ecosystem/registry.json)
 - [Validation report](modules/decision-infrastructure/VALIDATION_REPORT.md)
 
