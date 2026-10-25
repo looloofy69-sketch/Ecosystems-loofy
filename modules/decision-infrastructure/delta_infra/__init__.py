@@ -1,4 +1,4 @@
-"""Delta-Infrastructure Algorithm Workbench, version 0.7.0."""
+"""Delta-Infrastructure Algorithm Workbench, version 0.8.0."""
 from .algorithms import (
     local_search, signed_greedy, monotone_path, strong_path_explicit, strong_path_oracle,
     parity_correcting_lift, objective,
@@ -8,7 +8,7 @@ from .matching import MatchingDeltaMatroid, matching_separate, signed_greedy_mat
 from .oracles import ExplicitFamilyOracle, OracleContractError, TwistedSeparationOracle
 from .registry import Capability, CapabilityRegistry, default_registry
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 from .workflow import (
     TaskExecutionController, WorkflowDefinition, WorkflowRunStore,
