@@ -1,0 +1,416 @@
+{
+  "schema_version": "1.0.0",
+  "registry": "ecosystem/portfolio.json",
+  "repository": "looloofy69-sketch/Ecosystems-loofy",
+  "updated_at": "2026-10-25",
+  "policy": {
+    "production_claim_requires": [
+      "a named deployed version or immutable source revision",
+      "automated tests for the claimed interface",
+      "a verified integration or smoke-test result",
+      "security and privacy review for data and side-effect boundaries"
+    ],
+    "rule": "A repository, README, green build, design contract, or planned connection does not by itself establish runtime integration."
+  },
+  "components": [
+    {
+      "id": "ecosystems-loofy",
+      "name": "Ecosystems Loofy control plane and decision module",
+      "repository_url": "https://github.com/looloofy69-sketch/Ecosystems-loofy",
+      "role": "Canonical portfolio map, integration contracts, governance, and internal decision-algorithm prototype.",
+      "maturity": "prototype",
+      "integration_state": "local-library",
+      "production_endpoint": null,
+      "dependencies": [],
+      "interfaces": [
+        "Python package: modules/decision-infrastructure",
+        "Declarative workflow and portfolio CLI",
+        "SQLite task-run ledger"
+      ],
+      "known_gaps": [
+        "The portfolio map is a contract and inventory, not a deployed cross-system controller.",
+        "The decision module is not yet exposed as a versioned EL-Rouji service or MCP tool.",
+        "No production deployment, SLO, full security audit, or hard resource isolation is claimed."
+      ],
+      "evidence": [
+        {
+          "kind": "ci",
+          "url": "https://github.com/looloofy69-sketch/Ecosystems-loofy/actions/runs/40133209274",
+          "claim": "Repository validation and package test/build workflow passed; this does not prove production integration."
+        },
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/Ecosystems-loofy/tree/main/modules/decision-infrastructure",
+          "claim": "Decision algorithms, workflow/portfolio controllers, examples, and tests are present."
+        }
+      ]
+    },
+    {
+      "id": "el-rouji-core",
+      "name": "EL-Rouji assistant application",
+      "repository_url": "https://github.com/looloofy69-sketch/EL-Rouji",
+      "role": "Primary multilingual assistant UI and hosted API.",
+      "maturity": "deployed",
+      "integration_state": "live-core",
+      "production_endpoint": "https://el-rouji-70120b.v2.appdeploy.ai/",
+      "dependencies": [],
+      "interfaces": [
+        "GET /api/health",
+        "POST /api/chat",
+        "POST /api/research",
+        "POST /api/analyze-image",
+        "POST /api/analyze-document",
+        "GET /api/conversations",
+        "PUT /api/conversations/:id",
+        "DELETE /api/conversations/:id"
+      ],
+      "known_gaps": [
+        "The most recent connected AppDeploy check reported ready status for snapshot 1792849620557 and no QA errors, but not every endpoint or user journey was independently exercised.",
+        "The research route has no route-local requireAuth middleware in the inspected source; its intended public/private policy and server-enforced cost/rate limits require an explicit review.",
+        "Direct page scraping is disabled in the inspected deployed source; query-based search still depends on a correctly configured server-side Tavily key.",
+        "Full account isolation, retention/deletion, and production security verification remain release gates."
+      ],
+      "evidence": [
+        {
+          "kind": "deployment",
+          "url": "https://el-rouji-70120b.v2.appdeploy.ai/",
+          "claim": "Connected AppDeploy status reported ready at snapshot 1792849620557 on 2026-10-25; this is a platform status result, not an exhaustive end-to-end test."
+        },
+        {
+          "kind": "ci",
+          "url": "https://github.com/looloofy69-sketch/EL-Rouji/actions/runs/40099475237",
+          "claim": "GitHub Actions CI run 94 passed."
+        },
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/EL-Rouji/blob/main/backend/index.ts",
+          "claim": "Source of truth for current API handlers; compare with the deployed snapshot before release."
+        }
+      ]
+    },
+    {
+      "id": "el-rouji-mcp-adapter",
+      "name": "EL-Rouji MCP adapter",
+      "repository_url": "https://github.com/looloofy69-sketch/Mcps-EL-Rouji-",
+      "role": "Local MCP stdio adapter for selected EL-Rouji HTTP API endpoints.",
+      "maturity": "implemented-unverified",
+      "integration_state": "adapter-to-core",
+      "production_endpoint": null,
+      "dependencies": [
+        "el-rouji-core"
+      ],
+      "interfaces": [
+        "MCP over stdio",
+        "el_rouji_health",
+        "el_rouji_chat",
+        "el_rouji_research",
+        "el_rouji_analyze_text"
+      ],
+      "known_gaps": [
+        "The configured upstream API calls and local CI are documented, but a live end-to-end MCP-to-deployed-API test was not found in inspected evidence.",
+        "Generation-related tools are disabled by default and must remain opt-in until cost, privacy, and rate controls are verified.",
+        "This adapter does not provide arbitrary local-file access, device control, scheduling, or commerce operations."
+      ],
+      "evidence": [
+        {
+          "kind": "ci",
+          "url": "https://github.com/looloofy69-sketch/Mcps-EL-Rouji-/actions/runs/40097531696",
+          "claim": "CI run 5 passed configuration and server-import checks."
+        },
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/Mcps-EL-Rouji-/blob/main/src/el_rouji_mcp/server.py",
+          "claim": "The adapter exposes a bounded allow-list of upstream API calls."
+        }
+      ]
+    },
+    {
+      "id": "el-rouji-commerce",
+      "name": "EL-Rouji e-commerce specification",
+      "repository_url": "https://github.com/looloofy69-sketch/E-commerce-EL-Rouji-",
+      "role": "Commerce product requirements, draft API contracts, schemas, and proposed architecture.",
+      "maturity": "specification-only",
+      "integration_state": "contract-only",
+      "production_endpoint": null,
+      "dependencies": [
+        "el-rouji-core"
+      ],
+      "interfaces": [
+        "Draft product schema",
+        "Draft checkout request and response schemas",
+        "Draft error envelope"
+      ],
+      "known_gaps": [
+        "No runnable storefront, commerce API, database, inventory service, payment adapter, or fulfillment integration is present at the inspected baseline.",
+        "Market, currency, payment, shipping, tax, identity, return, and refund decisions remain open.",
+        "Do not expose purchase, checkout, or payment tools in EL-Rouji until the commerce backend exists and is independently security-tested."
+      ],
+      "evidence": [
+        {
+          "kind": "ci",
+          "url": "https://github.com/looloofy69-sketch/E-commerce-EL-Rouji-/actions/runs/40098775711",
+          "claim": "Contract validation passed; this validates draft schemas and examples rather than live endpoints."
+        },
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/E-commerce-EL-Rouji-/blob/main/docs/ARCHITECTURE.md",
+          "claim": "Architecture is explicitly a proposal."
+        }
+      ]
+    },
+    {
+      "id": "el-rouji-jobs",
+      "name": "EL-Rouji jobs design",
+      "repository_url": "https://github.com/looloofy69-sketch/EL-Rouji-jobs",
+      "role": "Requirements and architecture for future durable jobs and scheduling.",
+      "maturity": "specification-only",
+      "integration_state": "contract-only",
+      "production_endpoint": null,
+      "dependencies": [
+        "el-rouji-core"
+      ],
+      "interfaces": [
+        "Proposed job lifecycle",
+        "Proposed owner-scoped job API",
+        "Proposed bounded dispatcher and named handlers"
+      ],
+      "known_gaps": [
+        "No queue, scheduler, worker, job API, cron configuration, or durable job store is implemented in this repository.",
+        "A runtime choice and bounded due-job selection strategy require evidence before implementation.",
+        "Do not advertise scheduled or autonomous future execution until a concrete handler and end-to-end tests exist."
+      ],
+      "evidence": [
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/EL-Rouji-jobs/blob/main/docs/JOBS_DESIGN_SPEC.md",
+          "claim": "The current document explicitly labels the subsystem not implemented."
+        },
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/EL-Rouji-jobs/blob/main/docs/ADR-001-APPDEPLOY-JOB-RUNTIME.md",
+          "claim": "Candidate AppDeploy-native design is proposed, not approved or deployed."
+        }
+      ]
+    },
+    {
+      "id": "el-rouji-datasets",
+      "name": "EL-Rouji dataset governance",
+      "repository_url": "https://github.com/looloofy69-sketch/EL-Rouji-datasetes",
+      "role": "Dataset catalog, provenance/licensing policy, manifests, and validation templates.",
+      "maturity": "specification-only",
+      "integration_state": "contract-only",
+      "production_endpoint": null,
+      "dependencies": [
+        "el-rouji-core"
+      ],
+      "interfaces": [
+        "Dataset catalog",
+        "Manifest template",
+        "Proposed JSONL record schema",
+        "Validation script and CI"
+      ],
+      "known_gaps": [
+        "No production dataset artifact is present or verified as collected, licensed, approved, or released.",
+        "No training pipeline or production evaluation consumer is connected to the core application.",
+        "A dataset must not be used for training or redistribution solely because it is approved for evaluation."
+      ],
+      "evidence": [
+        {
+          "kind": "ci",
+          "url": "https://github.com/looloofy69-sketch/EL-Rouji-datasetes/actions/runs/40097219400",
+          "claim": "Dataset governance/template validation passed; no data-quality claim follows from this."
+        },
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/EL-Rouji-datasetes/blob/main/docs/DATASET_CATALOG.md",
+          "claim": "Catalog entries are proposed data families, not released datasets."
+        }
+      ]
+    },
+    {
+      "id": "artemis-android",
+      "name": "ARTEMIS Android automation runtime",
+      "repository_url": "https://github.com/looloofy69-sketch/artemis",
+      "role": "Android/device automation runtime with its own MCP server and accessibility helper package.",
+      "maturity": "implemented-unverified",
+      "integration_state": "standalone-mcp",
+      "production_endpoint": null,
+      "dependencies": [],
+      "interfaces": [
+        "ARTEMIS MCP server",
+        "ARTEMIS client/runtime packages",
+        "Android accessibility-helper package",
+        "ADB/device runtime"
+      ],
+      "known_gaps": [
+        "No verified connection to the EL-Rouji MCP adapter or this portfolio's controller has been found.",
+        "Phone/device capabilities require separate authorization, explicit user approval for consequential actions, device scoping, logging, and kill/cancel behavior before orchestration.",
+        "Repository size and tests do not establish successful operation on the user's specific phone or Android configuration."
+      ],
+      "evidence": [
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/artemis",
+          "claim": "Repository includes runtime, MCP, diagnostic, accessibility-helper, and test components; this portfolio audit did not establish a linked deployment."
+        }
+      ]
+    },
+    {
+      "id": "minna",
+      "name": "Minna agent runtime and field kit",
+      "repository_url": "https://github.com/looloofy69-sketch/Minna-ai-",
+      "role": "Separate pre-alpha Kotlin agent safety core and survey/research field kit.",
+      "maturity": "prototype",
+      "integration_state": "not-connected",
+      "production_endpoint": null,
+      "dependencies": [],
+      "interfaces": [
+        "Kotlin runtime core",
+        "Policy, approval, egress, capability execution, and evidence storage",
+        "Python survey rendering and analysis tools"
+      ],
+      "known_gaps": [
+        "The Kotlin build was not independently rerun in the inspected repository-status report.",
+        "Field-kit self-test did not complete in the prior verification environment, and the kit explicitly says it is not ready to field.",
+        "No shared API or runtime bridge to EL-Rouji is documented."
+      ],
+      "evidence": [
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/Minna-ai-/blob/main/docs/REPOSITORY_STATUS.md",
+          "claim": "The repository records import success but incomplete package-level verification."
+        },
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/Minna-ai-/blob/main/minna/README.md",
+          "claim": "The M0 runtime is explicitly pre-alpha."
+        }
+      ]
+    },
+    {
+      "id": "os-diablo",
+      "name": "OS Diablo business-operations governance",
+      "repository_url": "https://github.com/looloofy69-sketch/Os-diablo",
+      "role": "Architecture, backlog, release governance, and risk records for a separate business-operations assistant.",
+      "maturity": "governance-only",
+      "integration_state": "not-connected",
+      "production_endpoint": null,
+      "dependencies": [],
+      "interfaces": [
+        "Architecture and threat-model documents",
+        "Implementation backlog and issue map",
+        "Documentation-integrity checks"
+      ],
+      "known_gaps": [
+        "This repository does not contain the referenced business-management application implementation.",
+        "No verified runtime, database, model pool, or connector is connected to EL-Rouji through this repository.",
+        "Do not merge its execution or authorization assumptions into EL-Rouji without reviewing the actual source application."
+      ],
+      "evidence": [
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/Os-diablo",
+          "claim": "Repository README describes a documentation-first control plane, not the executable application."
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "mcp-to-core",
+      "from": "el-rouji-mcp-adapter",
+      "to": "el-rouji-core",
+      "interface": "MCP stdio tool calls translated into fixed HTTP requests to documented /api/* routes.",
+      "state": "implemented-but-not-end-to-end-verified",
+      "required_gates": [
+        "Run a live health call through MCP against the intended deployment.",
+        "Run chat, research, and text analysis with generation explicitly enabled only in a controlled test.",
+        "Verify timeout handling, response-size bounds, error redaction, provider cost, and cancellation semantics."
+      ]
+    },
+    {
+      "id": "decision-module-to-core",
+      "from": "ecosystems-loofy",
+      "to": "el-rouji-core",
+      "interface": "Future narrow adapter; in-process Python library or separately hosted service must be chosen before implementation.",
+      "state": "proposed",
+      "required_gates": [
+        "Define versioned input/output schemas and permitted capability IDs.",
+        "Set request deadline, maximum serialized input/output, task-count and cost budgets.",
+        "Reject arbitrary code, shell execution, unregistered capabilities, and unknown side effects.",
+        "Return structured evidence and run identifiers; add contract and integration tests."
+      ]
+    },
+    {
+      "id": "artemis-to-core",
+      "from": "artemis-android",
+      "to": "el-rouji-core",
+      "interface": "Future host-orchestrated MCP connection; no direct device-control endpoint is currently claimed.",
+      "state": "proposed",
+      "required_gates": [
+        "Register only reviewed device tools and device targets.",
+        "Require explicit approval for consequential device actions and keep read-only tools separate.",
+        "Enforce one-use approvals, timeouts, cancellation, audit records, and safe behavior on uncertain results.",
+        "Test on a controlled device before enabling the connection."
+      ]
+    },
+    {
+      "id": "commerce-to-core",
+      "from": "el-rouji-commerce",
+      "to": "el-rouji-core",
+      "interface": "Future commerce API and optional AI assistance after a runnable commerce backend exists.",
+      "state": "blocked",
+      "required_gates": [
+        "Implement and deploy server-owned catalog, inventory, cart, orders, identity and audit boundaries.",
+        "Choose supported payment and fulfillment methods and verify provider credentials/webhooks.",
+        "Enforce server-side price recomputation, idempotency, ownership checks, and reconciliation.",
+        "Add end-to-end tests before exposing purchase-related assistant tools."
+      ]
+    },
+    {
+      "id": "jobs-to-core",
+      "from": "el-rouji-jobs",
+      "to": "el-rouji-core",
+      "interface": "Future bounded, owner-scoped job API with named server-defined handlers.",
+      "state": "blocked",
+      "required_gates": [
+        "Choose a concrete first job type and a bounded queue/claim design.",
+        "Specify owner identity, lifecycle, retry, idempotency, cancellation, time-zone and retention semantics.",
+        "Prove due-job queries remain bounded at representative volume.",
+        "Test duplicate delivery, restart, unknown outcomes, cancellation races, cross-owner denial, and rollback."
+      ]
+    },
+    {
+      "id": "datasets-to-core",
+      "from": "el-rouji-datasets",
+      "to": "el-rouji-core",
+      "interface": "Future opt-in evaluation harness and versioned evaluation artifacts, not runtime prompt injection.",
+      "state": "blocked",
+      "required_gates": [
+        "Release at least one versioned synthetic/approved dataset with provenance and checksum.",
+        "Define separate permissions for evaluation, retrieval, training, and redistribution.",
+        "Add a reproducible evaluator and store summary evidence without private conversation data."
+      ]
+    },
+    {
+      "id": "minna-to-core",
+      "from": "minna",
+      "to": "el-rouji-core",
+      "interface": "No shared runtime interface defined.",
+      "state": "not-proposed",
+      "required_gates": [
+        "Keep projects separate until a specific shared capability and non-duplicative boundary is justified."
+      ]
+    },
+    {
+      "id": "os-diablo-to-core",
+      "from": "os-diablo",
+      "to": "el-rouji-core",
+      "interface": "No shared runtime interface defined.",
+      "state": "not-proposed",
+      "required_gates": [
+        "Keep projects separate until the referenced executable application is available for inspection and a concrete integration is justified."
+      ]
+    }
+  ]
+}

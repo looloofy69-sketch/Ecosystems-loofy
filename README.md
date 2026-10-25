@@ -30,6 +30,16 @@ The module has a shared RunContext with an immutable policy snapshot and a budge
 
 The v0.7.0 revision was validated in [GitHub Actions run 40133079284](https://github.com/looloofy69-sketch/Ecosystems-loofy/actions/runs/40133079284) at commit 153ae59a629ebdc3a4a2cbcbd8bff1c5943c9693. Registry/link validation, 4 repository tests, package installation, compileall, 70 decision-module tests, CLI smoke tests, and wheel build all passed. This is evidence for an integrated internal prototype, not production readiness.
 
+## Portfolio integration audit
+
+The cross-repository inventory is maintained separately from the local decision-module registry:
+
+- [Portfolio registry](ecosystem/portfolio.json) — nine repositories/projects, verified maturity labels, dependencies, evidence links, known gaps, and explicit connection states.
+- [Portfolio integration contract](docs/architecture/portfolio-integration-contract.md) — interface boundaries, security invariants, test gates, and implementation sequence.
+- [Portfolio registry schema](schemas/portfolio.schema.json) — machine-readable contract for inventory and connection records.
+
+A listed repository is not automatically an integrated component. The MCP adapter-to-core relationship is recorded as implemented but not end-to-end verified; commerce, jobs, datasets, ARTEMIS, Minna, and OS Diablo remain unconnected or contract-only until their stated gates pass. The portfolio validator checks this inventory without network calls.
+
 ## Key documents
 
 - [System model](docs/architecture/system-model.md)
@@ -46,7 +56,7 @@ The v0.7.0 revision was validated in [GitHub Actions run 40133079284](https://gi
 
 Use Python 3.12 (the CI baseline):
 
-    python scripts/validate_registry.py
+    python scripts/validate_registry.py  # local registry + cross-repository portfolio + Markdown links
     python -m unittest discover -s tests -v
     python -m pip install -e modules/decision-infrastructure
     python -m unittest discover -s modules/decision-infrastructure/tests -v
