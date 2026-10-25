@@ -100,10 +100,23 @@ def _authorize(request: Request) -> tuple[str | None, JSONResponse | None]:
     return token_fingerprint, None
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate JSON object keys are not allowed.")
+        result[key] = value
+    return result
+
+
 def _loads_strict(raw: bytes) -> Any:
     try:
         decoded = raw.decode("utf-8")
-        return json.loads(decoded, parse_constant=_reject_constant)
+        return json.loads(
+            decoded,
+            parse_constant=_reject_constant,
+            object_pairs_hook=_reject_duplicate_keys,
+        )
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         raise ValueError("Request body must contain valid UTF-8 JSON with finite numbers.") from exc
 
