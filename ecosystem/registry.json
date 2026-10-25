@@ -71,10 +71,10 @@
       ],
       "validation": {
         "status": "ci-passed",
-        "tests": 77,
+        "tests": 80,
         "date": "2026-10-25",
-        "scope": "GitHub Actions run 40150302288 at commit b95724360eb3cf3983f38b3229e6c01accec88cc: 73 decision-module tests and 4 repository tests; registry/link checks, package install, compileall, CLI smoke tests, and wheel build passed.",
-        "note": "The package now includes retry-safe portfolio checkpoint/resume. Hard isolation, authenticated authorization, authoritative state compare-and-swap, and production operations remain incomplete."
+        "scope": "GitHub Actions run 40150460695 at commit fee5daf1a332a04b206668ee5d0bbaad2a715ede: 74 decision-module tests and 6 repository tests; registry/link checks, package install, compileall, CLI smoke tests, and wheel build passed.",
+        "note": "This validates the v0.8.0 portfolio checkpoint/resume implementation at the referenced commit. Hard isolation, authenticated authorization, authoritative state compare-and-swap, and production operations remain incomplete."
       }
     }
   ]
