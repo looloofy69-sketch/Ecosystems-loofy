@@ -104,9 +104,9 @@ class DecisionApiTests(unittest.TestCase):
 
     def test_malformed_or_nonfinite_json_is_rejected(self):
         malformed = self.client.post(
-            "/v1/run", headers=self.auth(),
-            content=b'{"capability_id":',
+            "/v1/run",
             headers={**self.auth(), "Content-Type": "application/json"},
+            content=b'{"capability_id":',
         )
         self.assertEqual(malformed.status_code, 400)
 
