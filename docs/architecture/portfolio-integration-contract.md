@@ -39,32 +39,17 @@ Minimum verification before enabling generation tools:
 
 ### Decision infrastructure
 
-A first isolated adapter now exists at [\`adapters/decision-mcp/\`](../../adapters/decision-mcp/README.md). It runs as a separate MCP-over-stdio process and exposes two tools: capability discovery and one bounded execution call against a fixed allow-list of pure, retry-safe decision algorithms. The adapter rejects unknown payload fields, non-finite JSON values, oversized inputs/outputs, and graph/matrix/family instances above conservative limits. It accounts for input/output/task budgets and uses cooperative checkpoints.
+A first isolated adapter exists at [`adapters/decision-mcp/`](../../adapters/decision-mcp/README.md). It runs as a separate MCP-over-stdio process and exposes capability discovery plus one bounded execution call against a fixed allow-list of pure, retry-safe decision algorithms.
 
-**This is not yet a connection to the EL-Rouji application.** No hosted endpoint, inbound core route, or MCP host configuration is claimed. A client host can configure the decision server alongside another MCP server, but the presence of both servers does not mean the EL-Rouji UI routes assistant requests to the decision tools.
+A second prototype at [`adapters/decision-api/`](../../adapters/decision-api/README.md) exposes authenticated `GET /v1/capabilities` and `POST /v1/run` endpoints for a possible server-to-server connection. It reuses the same decision runner, requires a high-entropy bearer token, bounds request size, rate-limits by the service-token fingerprint, and maps results to structured HTTP statuses. The token is a service credential, not user identity; EL-Rouji must enforce its own user access policy and per-user quotas.
 
-The implemented request is `ecosystem_run_capability(capability_id, input_json)`. The adapter creates request/trace IDs and returns a structured status, capability result, and runtime/budget diagnostics. The fixed tool allow-list is intentionally narrower than the Python registry. The deployment choice for any future remote service or direct core binding remains open and requires a separate threat model.
+**Neither adapter is yet connected to the EL-Rouji application.** The HTTP bridge is not deployed, and no service URL or token is configured in AppDeploy. The local MCP process is not directly callable by the hosted app. Hosting approval, TLS ingress, secret injection, a fixed backend origin, endpoint tests, and deployed version/rollback evidence remain release gates. The HTTP bridge currently uses an in-memory rate limiter and cooperative—not hard—timeouts, so horizontal scaling or hostile remote workloads require additional controls.
 
-A request envelope should include:
-
-- `contract_version`, `request_id`, `trace_id`, and `caller_component`;
-- a registered `capability_id` and `capability_version`;
-- schema-validated JSON input;
-- a bounded deadline and execution budget;
-- a declared cancellation/approval context where applicable.
-
-A response should include:
-
-- the same request/trace identifiers;
-- `status` from a fixed enum (`succeeded`, `rejected`, `cancelled`, `budget_exceeded`, `failed`);
-- schema-valid result data or a sanitized error envelope;
-- a run identifier and evidence summary (selected capability/version, checks performed, budget consumed, and whether the result was independently verified).
+The local MCP request is `ecosystem_run_capability(capability_id, input_json)`. Both adapters expose the same underlying seven-capability allow-list; neither exposes workflows, arbitrary code, shell commands, arbitrary URLs, file access, or state-changing operations.
 
 Security invariants:
 
-- Allow-listed capability identifiers only. Workflow JSON is data and must never select Python imports, shell commands, arbitrary URLs, or executable expressions.
-- Unknown side-effect classification is a rejection, not permission.
-- Read-only/pure capabilities may run under a bounded default policy; writes, external communications, and device actions require explicit policy and suitable approval.
+- Allow-listed capability identifiers only. Unknown side-effect classification is a rejection, not permission.
 - Validate candidate outputs independently before accepting them as authoritative state.
 - Bound task count, serialized input/output, deadline, and provider spend. Cooperative cancellation is not a hard timeout; isolate blocking/untrusted handlers when hard termination is required.
 - Do not claim exactly-once execution. Recovery for a pure/retry-safe computation is not a distributed transaction for external side effects.
