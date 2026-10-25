@@ -268,12 +268,18 @@ class AlgorithmStrategy:
     preserve_keys: tuple[str, ...] = ()
     require_after_feasible: bool = False
     description: str = ""
+    retry_safe: bool = False
+    version: str = "1.0.0"
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name or not isinstance(self.family, str) or not self.family:
             raise PortfolioDefinitionError("strategy name and family must be non-empty strings")
         if not callable(self.step):
             raise PortfolioDefinitionError(f"strategy {self.name!r} requires a callable step")
+        if not isinstance(self.retry_safe, bool):
+            raise PortfolioDefinitionError("strategy retry_safe must be boolean")
+        if not isinstance(self.version, str) or not self.version.strip():
+            raise PortfolioDefinitionError("strategy version must be a non-empty string")
         if not isinstance(self.when, tuple) or any(not isinstance(item, StatePredicate) for item in self.when):
             raise PortfolioDefinitionError("strategy when must be a tuple of StatePredicate values")
         if isinstance(self.priority, bool) or not isinstance(self.priority, int):
@@ -293,7 +299,8 @@ class AlgorithmStrategy:
 
     def describe(self) -> dict[str, Any]:
         return {
-            "name": self.name, "family": self.family, "priority": self.priority,
+            "name": self.name, "family": self.family, "version": self.version,
+            "retry_safe": self.retry_safe, "priority": self.priority,
             "turn_quota": self.turn_quota, "preserve_keys": list(self.preserve_keys),
             "require_after_feasible": self.require_after_feasible,
             "when": [p.describe() for p in self.when], "description": self.description,
