@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecosystem-decision-mcp"
+version = "0.1.0"
+description = "Bounded read-only MCP adapter for EL-Rouji ecosystem decision algorithms"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["mcp>=2.0.0,<3"]
+
+[project.scripts]
+ecosystem-decision-mcp = "ecosystem_decision_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
