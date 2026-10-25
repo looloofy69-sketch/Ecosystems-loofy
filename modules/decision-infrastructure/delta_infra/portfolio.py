@@ -373,6 +373,7 @@ class PortfolioController:
         budget: ExecutionBudget | None = None,
         cancelled: Callable[[], bool] | None = None,
         run_context: RunContext | None = None,
+        resume_from_run_id: str | None = None,
     ) -> dict[str, Any]:
         if mode not in PORTFOLIO_MODES:
             raise PortfolioDefinitionError(f"mode must be one of {PORTFOLIO_MODES}")
