@@ -39,7 +39,11 @@ Minimum verification before enabling generation tools:
 
 ### Decision infrastructure
 
-**Preferred first seam:** a narrow, versioned adapter around the existing Python package, not direct arbitrary execution inside the chat route. The deployment choice (in-process worker, separate service, or MCP server) must be made before implementation based on dependency compatibility and operational isolation.
+A first isolated adapter now exists at [\`adapters/decision-mcp/\`](../../adapters/decision-mcp/README.md). It runs as a separate MCP-over-stdio process and exposes two tools: capability discovery and one bounded execution call against a fixed allow-list of pure, retry-safe decision algorithms. The adapter rejects unknown payload fields, non-finite JSON values, oversized inputs/outputs, and graph/matrix/family instances above conservative limits. It accounts for input/output/task budgets and uses cooperative checkpoints.
+
+**This is not yet a connection to the EL-Rouji application.** No hosted endpoint, inbound core route, or MCP host configuration is claimed. A client host can configure the decision server alongside another MCP server, but the presence of both servers does not mean the EL-Rouji UI routes assistant requests to the decision tools.
+
+The implemented request is `ecosystem_run_capability(capability_id, input_json)`. The adapter creates request/trace IDs and returns a structured status, capability result, and runtime/budget diagnostics. The fixed tool allow-list is intentionally narrower than the Python registry. The deployment choice for any future remote service or direct core binding remains open and requires a separate threat model.
 
 A request envelope should include:
 
