@@ -40,8 +40,12 @@ Requires Python 3.10+ and NetworkX 3.x.
     python -m delta_infra.cli --list-capabilities --pretty
     python -m delta_infra.workflow_cli examples/workflows/internal_matching_validation.json --pretty
     python -m delta_infra.portfolio_cli examples/portfolio_adaptive_instance.json --mode auto --pretty
+    python -m delta_infra.portfolio_cli examples/portfolio_adaptive_instance.json --mode auto --max-turns 1 --db runs.sqlite3 --pretty
+    python -m delta_infra.portfolio_cli examples/portfolio_adaptive_instance.json --mode auto --max-turns 10 --db runs.sqlite3 --resume RUN_ID --pretty
 
-See ARCHITECTURE.md, VALIDATION_REPORT.md, CHANGELOG.md, and the root roadmap. Portfolio resume requires a configured WorkflowRunStore and the original initial state, mode, and same versioned strategy catalog.
+For the resume example, take `RUN_ID` from the first run's JSON output. The built-in demo strategies declare a version and `retry_safe=true`; custom strategies default to non-resumable. Recovery requires the same initial state, mode, failure policy, and versioned strategy catalog. It may replay a turn from the previous pre-turn checkpoint, so retry safety is a trusted contract, not an exactly-once guarantee.
+
+See ARCHITECTURE.md, VALIDATION_REPORT.md, CHANGELOG.md, and the root roadmap.
 
 ## Correctness boundaries
 
