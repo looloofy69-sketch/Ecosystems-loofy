@@ -140,7 +140,7 @@ def build_explicit_optimization_portfolio(instance: Mapping[str, Any]):
         "local_search_primary", "local-search",
         solver_step("local_search_primary", "delta_matroid.local_search"),
         (optimization_phase, pending_local), priority=10, turn_quota=1,
-        preserve_keys=preserve, description="Best-improvement search from requested feasible initial set.",
+        preserve_keys=preserve, description="Best-improvement search from requested feasible initial set.", retry_safe=True, version="1.0.0",
     ))
     if alternate is not None:
         def restart_step(state: Mapping[str, Any], *, context: RunContext | None = None) -> StrategyTurn:
@@ -171,12 +171,13 @@ def build_explicit_optimization_portfolio(instance: Mapping[str, Any]):
             (optimization_phase, StatePredicate("features.pending_solvers", "contains", "local_search_restart")),
             priority=5, turn_quota=1, preserve_keys=preserve,
             description="Repeat LocalSearch from a distinct feasible starting set to inspect path dependence.",
+            retry_safe=True, version="1.0.0",
         ))
     catalog.register(AlgorithmStrategy(
         "signed_greedy", "signed-greedy", solver_step("signed_greedy", "delta_matroid.signed_greedy"),
         (optimization_phase, StatePredicate("features.pending_solvers", "contains", "signed_greedy")),
         priority=10, turn_quota=1, preserve_keys=preserve,
-        description="Optimize using signed greedy and the separation oracle.",
+        description="Optimize using signed greedy and the separation oracle.", retry_safe=True, version="1.0.0",
     ))
 
     def independent_verify(state: Mapping[str, Any]) -> StrategyTurn:
@@ -239,6 +240,7 @@ def build_explicit_optimization_portfolio(instance: Mapping[str, Any]):
         "independent_verify", "verification", independent_verify, (StatePredicate("phase", "eq", "verify"),),
         priority=100, preserve_keys=preserve,
         description="Independently verify feasibility and objective values by scanning the explicit family.",
+        retry_safe=True, version="1.0.0",
     ))
 
     pending = ["local_search_primary"]
@@ -266,14 +268,17 @@ def main() -> None:
     parser.add_argument("--mode", choices=("rotation", "alternation", "turn-taking", "shape-driven", "auto"), default="rotation")
     parser.add_argument("--max-turns", type=int, default=20)
     parser.add_argument("--db", default=None, help="Optional SQLite run ledger path")
+    parser.add_argument("--resume", default=None, help="Resume a retry-safe portfolio run by run ID; requires --db")
     parser.add_argument("--pretty", action="store_true")
     args = parser.parse_args()
     try:
         instance = json.loads(args.instance.read_text(encoding="utf-8"))
         controller, state, catalog = build_explicit_optimization_portfolio(instance)
+        if args.resume and not args.db:
+            raise ValueError("--resume requires --db")
         if args.db:
             controller.run_store = WorkflowRunStore(args.db)
-        result = controller.run(state, mode=args.mode, max_turns=args.max_turns)
+        result = controller.run(state, mode=args.mode, max_turns=args.max_turns, resume_from_run_id=args.resume)
         result["registered_strategies"] = catalog.describe()
         print(json.dumps(result, indent=2 if args.pretty else None, ensure_ascii=False, allow_nan=False))
         if result["status"] in {"failed", "blocked", "turn_limit_reached", "cancelled", "budget_exceeded"}:
