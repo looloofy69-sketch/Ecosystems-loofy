@@ -25,6 +25,10 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Install decision-infrastructure module
         run: python -m pip install -e modules/decision-infrastructure
+      - name: Install decision MCP adapter
+        run: python -m pip install -e adapters/decision-mcp
+      - name: Run decision MCP adapter tests
+        run: python -m unittest discover -s adapters/decision-mcp/tests -v
       - name: Compile imported package
         run: python -m compileall -q modules/decision-infrastructure/delta_infra
       - name: Run decision-infrastructure tests
