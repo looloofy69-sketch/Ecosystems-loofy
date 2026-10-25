@@ -147,7 +147,8 @@ def _validate_explicit_family(payload: dict[str, Any], capability_id: str) -> No
             raise InputRejected("feasible_sets must not contain duplicate members")
         seen_family.add(key)
 
-    _finite_weights(payload.get("weights"), ground)
+    if capability_id in {"delta_matroid.local_search", "delta_matroid.signed_greedy"}:
+        _finite_weights(payload.get("weights"), ground)
     for field in ("initial", "A", "B"):
         if field in payload:
             labels = _string_list(payload[field], field, maximum=len(ground), allow_empty=True)
