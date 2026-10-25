@@ -1,9 +1,9 @@
 # Delta-Infrastructure Decision Module
 
-**Version:** 0.7.0  
+**Version:** 0.8.0  
 **Status:** integrated module; not production-ready.
 
-This package provides deterministic delta-matroid algorithms, a capability registry, a declarative workflow controller, a state-aware strategy portfolio, a SQLite run ledger, and a shared RunContext with budget accounting, cooperative runtime guard enforcement, and durable task-level checkpoints for retry-safe workflow recovery.
+This package provides deterministic delta-matroid algorithms, a capability registry, a declarative workflow controller, a state-aware strategy portfolio, a SQLite run ledger, and a shared RunContext with budget accounting, cooperative runtime guard enforcement, durable task-level workflow recovery, and retry-safe portfolio-turn checkpoint/resume.
 
 ## Included algorithms
 
@@ -19,7 +19,7 @@ This package provides deterministic delta-matroid algorithms, a capability regis
 
 The registry exposes seven JSON-callable capabilities. Workflow documents may invoke only registered capabilities and allow-listed built-ins; they cannot load Python modules, execute shell commands, or evaluate expressions.
 
-## Runtime integration in v0.7.0
+## Runtime integration in v0.8.0
 
 TaskExecutionController and PortfolioController accept an ExecutionBudget and cooperative cancellation callback. Controller-boundary checks cover planned task/turn counts, serialized input sizes, deadline/cancellation checkpoints, and output-size checks before task output or portfolio state is committed. Runtime stop outcomes are recorded as cancelled or budget-exceeded where execution has begun. The immutable policy snapshot and budget ledger travel with the RunContext; deterministic handlers receive checkpoints inside longer algorithm loops.
 
@@ -27,7 +27,7 @@ Checkpoints are append-only and sequence-checked in SQLite. Resume requires the 
 - Preflight rejection happens before a run record exists.
 - Runtime checks are cooperative. They do not interrupt a blocking capability or strategy.
 - Serialized byte limits do not enforce CPU or memory usage.
-- SQLite history is not transactional side-effect management; replay/resume and exactly-once semantics are not provided.
+- SQLite history and checkpoints do not provide transactional side-effect management or exactly-once semantics. Portfolio resume replays from the latest pre-turn checkpoint and is enabled only when every registered strategy explicitly declares `retry_safe=true`.
 - Workflow input/output history can contain sensitive data; do not submit secrets.
 - The portfolio is an internal strategy scheduler, not a general autonomous-agent runtime.
 
@@ -41,7 +41,7 @@ Requires Python 3.10+ and NetworkX 3.x.
     python -m delta_infra.workflow_cli examples/workflows/internal_matching_validation.json --pretty
     python -m delta_infra.portfolio_cli examples/portfolio_adaptive_instance.json --mode auto --pretty
 
-See ARCHITECTURE.md, VALIDATION_REPORT.md, CHANGELOG.md, and the root roadmap.
+See ARCHITECTURE.md, VALIDATION_REPORT.md, CHANGELOG.md, and the root roadmap. Portfolio resume requires a configured WorkflowRunStore and the original initial state, mode, and same versioned strategy catalog.
 
 ## Correctness boundaries
 
