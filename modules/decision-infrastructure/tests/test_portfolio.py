@@ -208,4 +208,24 @@ class PortfolioSchedulingTests(unittest.TestCase):
                 )
 
 
+
+    def test_builtin_demo_portfolio_can_resume_from_sqlite_checkpoint(self):
+        import tempfile
+        instance = json.loads(INSTANCE_PATH.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as temporary:
+            store = WorkflowRunStore(Path(temporary) / "runs.sqlite3")
+            controller, initial, catalog = build_explicit_optimization_portfolio(instance)
+            controller.run_store = store
+            self.assertTrue(all(strategy.retry_safe for strategy in catalog.all()))
+            first = controller.run(initial, mode="auto", max_turns=1)
+            self.assertEqual(first["status"], "turn_limit_reached")
+            resumed = controller.run(
+                initial, mode="auto", max_turns=10, resume_from_run_id=first["run_id"],
+            )
+            self.assertEqual(resumed["run_id"], first["run_id"])
+            self.assertEqual(resumed["status"], "completed")
+            self.assertTrue(resumed["final_state"]["verification"]["verified"])
+            self.assertEqual(resumed["final_state"]["verification"]["best_objective_value"], 9)
+
+
 if __name__=="__main__": unittest.main()
