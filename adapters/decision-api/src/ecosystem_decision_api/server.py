@@ -185,9 +185,12 @@ def create_app(*, rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE) ->
             except ValueError:
                 return _error("rejected", "Content-Length header is invalid.", 400)
 
-        raw = await request.body()
-        if len(raw) > MAX_REQUEST_BODY_BYTES:
-            return _error("rejected", "Request body exceeds the configured byte limit.", 413)
+        raw_buffer = bytearray()
+        async for chunk in request.stream():
+            raw_buffer.extend(chunk)
+            if len(raw_buffer) > MAX_REQUEST_BODY_BYTES:
+                return _error("rejected", "Request body exceeds the configured byte limit.", 413)
+        raw = bytes(raw_buffer)
 
         try:
             body = _loads_strict(raw)
