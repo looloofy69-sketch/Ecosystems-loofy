@@ -26,14 +26,16 @@
         "Python package: modules/decision-infrastructure",
         "Declarative workflow and portfolio CLI",
         "SQLite task-run ledger",
-        "Read-only stdio MCP server at adapters/decision-mcp/ for allow-listed pure decision capabilities"
+        "Read-only stdio MCP server at adapters/decision-mcp/ for allow-listed pure decision capabilities",
+        "Authenticated HTTP bridge prototype at adapters/decision-api/: GET /v1/capabilities and POST /v1/run"
       ],
       "known_gaps": [
         "The portfolio map is a contract and inventory, not a deployed cross-system controller.",
         "The decision module is not yet exposed as a versioned EL-Rouji service or MCP tool.",
         "No production deployment, SLO, full security audit, or hard resource isolation is claimed.",
         "The decision MCP server is a separate local process; no configured MCP host currently connects it to the EL-Rouji assistant.",
-        "The adapter uses cooperative deadlines and bounded inputs, not hard process-level timeouts or a hostile-code sandbox."
+        "The adapter uses cooperative deadlines and bounded inputs, not hard process-level timeouts or a hostile-code sandbox.",
+        "The HTTP bridge is not deployed; TLS ingress, service token injection, a fixed service URL, per-user core quotas, and live end-to-end validation are still required."
       ],
       "evidence": [
         {
@@ -50,6 +52,11 @@
           "kind": "source",
           "url": "https://github.com/looloofy69-sketch/Ecosystems-loofy/tree/main/adapters/decision-mcp",
           "claim": "A separately packaged MCP adapter exposes a fixed list of pure capabilities; repository CI must pass before this code is considered accepted."
+        },
+        {
+          "kind": "source",
+          "url": "https://github.com/looloofy69-sketch/Ecosystems-loofy/tree/main/adapters/decision-api",
+          "claim": "A private HTTP bridge prototype exposes only the allow-listed pure capability runner; no production endpoint is deployed."
         }
       ]
     },
@@ -340,14 +347,15 @@
       "id": "decision-module-to-core",
       "from": "ecosystems-loofy",
       "to": "el-rouji-core",
-      "interface": "An isolated stdio MCP server now wraps a fixed allow-list of pure capabilities. Connecting it to EL-Rouji requires an explicitly configured host/orchestrator; no direct assistant/backend binding is claimed.",
+      "interface": "The local stdio MCP adapter and a separate authenticated HTTP bridge prototype wrap the same fixed pure-capability runner. The HTTP bridge is not deployed and EL-Rouji has no configured outbound integration yet.",
       "state": "proposed",
       "required_gates": [
-        "Pass repository CI for the adapter and its bounded input/output/runtime tests.",
-        "Verify MCP tool discovery and calls through a real stdio host using synthetic bounded inputs.",
-        "Choose and document how an assistant host routes to the separate decision server; do not imply the web app directly calls MCP.",
-        "If a deployed service is chosen, add authentication, authorization, transport protection, monitoring, and deployment rollback before exposing it remotely.",
-        "Keep only side-effect-free, retry-safe capability IDs allow-listed; reject workflows, arbitrary code, shell commands, and network/file operations."
+        "Pass CI tests for MCP and HTTP adapter contracts, and build the bridge container.",
+        "Choose an approved hosting platform and deploy the bridge behind TLS with a high-entropy token stored only as a service secret.",
+        "Configure EL-Rouji's server-side outbound token and a fixed bridge origin; never accept the origin from browser/client input.",
+        "Make core access policy and per-user quotas explicit before forwarding requests to a shared service credential.",
+        "Test auth rejection, rate limits, malformed/oversized input, response bounds, timeout/cancellation and account isolation against the deployed service.",
+        "Record the deployed version and rollback procedure before enabling any assistant-visible tool."
       ]
     },
     {

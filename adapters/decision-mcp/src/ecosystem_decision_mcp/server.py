@@ -106,6 +106,15 @@ def _reject_constant(value: str) -> None:
     raise InputRejected(f"Non-standard JSON number is not allowed: {value}")
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise InputRejected("Duplicate JSON object keys are not allowed.")
+        result[key] = value
+    return result
+
+
 def _is_finite_number(value: Any) -> bool:
     return not isinstance(value, bool) and isinstance(value, (int, float)) and (
         isinstance(value, int) or math.isfinite(value)
@@ -261,7 +270,11 @@ def _execute(capability_id: str, input_json: str, cancelled: threading.Event) ->
         if not isinstance(input_json, str) or len(input_json.encode("utf-8")) > MAX_INPUT_BYTES:
             return _error_response(request_id, "rejected", "Input JSON is missing or exceeds the byte limit.")
         try:
-            payload = json.loads(input_json, parse_constant=_reject_constant)
+            payload = json.loads(
+                input_json,
+                parse_constant=_reject_constant,
+                object_pairs_hook=_reject_duplicate_keys,
+            )
             payload = _validated_payload(capability_id, payload)
         except (ValueError, TypeError, KeyError, json.JSONDecodeError):
             return _error_response(request_id, "rejected", "Input JSON is invalid or violates the capability contract.")

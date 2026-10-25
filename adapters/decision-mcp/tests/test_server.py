@@ -77,6 +77,13 @@ class DecisionMcpTests(unittest.TestCase):
         ))
         self.assertEqual(nonfinite["status"], "rejected")
 
+        duplicate_key = json.loads(server._execute(
+            "matching.signed_greedy",
+            '{"vertices":["a","b"],"edges":[["a","b"]],"weights":{"a":1,"a":999,"b":2}}',
+            threading.Event(),
+        ))
+        self.assertEqual(duplicate_key["status"], "rejected")
+
         oversized = json.loads(server._execute(
             "matching.signed_greedy", " " * (server.MAX_INPUT_BYTES + 1), threading.Event()
         ))
