@@ -50,3 +50,10 @@ These checkpoints recover declarative workflow execution, not external transacti
 ## Validation
 
 The 0.7.0 CI run must be recorded against the exact post-change commit in the validation report; the previous 0.6.0 run does not validate this implementation.
+
+
+## Portfolio checkpoint and recovery (v0.8.0)
+
+The portfolio controller can persist pre-turn checkpoints in the existing SQLite checkpoint table. A checkpoint contains the last committed state, turn history, scheduler cursors, strategy counters, disabled strategies, and RunContext budget metadata. The fingerprint binds recovery to the portfolio ID, requested mode, initial state, failure policy, and strategy descriptors including explicit version and retry-safety declarations.
+
+Resume requires a configured WorkflowRunStore, the same initial state and mode, and every registered strategy to declare `retry_safe=true`. The default is false. A changed strategy version or fingerprint is rejected. The last checkpoint is written before a turn; if the process fails after a turn commits but before the next checkpoint, recovery may replay that turn from the prior state. This is safe only under the strategy's retry-safety contract and does not guarantee deterministic replay or exactly-once side effects. A completed or failed portfolio run is not resumable; turn-limit, cancellation, and budget-exceeded runs can be resumed when a valid checkpoint exists.
