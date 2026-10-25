@@ -18,6 +18,10 @@ RUN python -m pip install --no-cache-dir /app/adapters/decision-mcp
 COPY adapters/decision-api/ /app/adapters/decision-api/
 RUN python -m pip install --no-cache-dir /app/adapters/decision-api
 
+# Run the service as an unprivileged account in the container.
+RUN groupadd --system decision && useradd --system --gid decision --home-dir /home/decision --create-home decision
+USER decision
+
 EXPOSE 8080
 
 CMD ["uvicorn", "ecosystem_decision_api.server:app", "--host", "0.0.0.0", "--port", "8080"]
