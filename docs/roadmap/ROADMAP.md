@@ -40,8 +40,8 @@ Evidence for that baseline: [CI run 40130032418](https://github.com/looloofy69-s
 - [x] Fail closed on unknown side-effect classifications; require an approval declaration for write/external capabilities.
 - [ ] Add authenticated approval/authorization, RBAC, and an auditable policy decision record.
 - [ ] Bind state-changing commits to an authoritative state version using atomic compare-and-swap.
-- [ ] Add checkpoint/resume for adaptive portfolio turns.
-- [ ] Define idempotency/reconciliation for external operations; SQLite checkpoints do not provide exactly-once side effects.
+- [x] Add append-only checkpoint/resume for adaptive portfolio turns when all strategies explicitly declare retry safety; fingerprint the initial state and versioned strategy catalog.
+- [ ] Define idempotency/reconciliation for external operations; SQLite checkpoints do not provide exactly-once side effects. Portfolio resume is limited to strategies that explicitly declare retry safety.
 
 ## Phase 4 — Adaptive policy and evaluation evidence
 
