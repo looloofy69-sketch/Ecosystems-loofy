@@ -15,7 +15,7 @@ import time
 import uuid
 from typing import Any, Callable, Mapping, Sequence
 
-from .runtime import ExecutionBudget, ExecutionBudgetExceeded, ExecutionCancelled, RunContext, RuntimeGuard
+from .runtime import BudgetLedger, ExecutionBudget, ExecutionBudgetExceeded, ExecutionCancelled, RunContext, RuntimeGuard
 
 PORTFOLIO_MODES = ("rotation", "alternation", "turn-taking", "shape-driven", "auto")
 TURN_STATUSES = ("progress", "no_change", "complete", "failed")
@@ -384,14 +384,46 @@ class PortfolioController:
         state = _json_copy(original_state, label="initial_state")
         if run_context is not None and budget is not None and run_context.budget != budget:
             raise PortfolioDefinitionError("budget must match the supplied run_context budget")
-        if run_context is None:
+        if resume_from_run_id is not None and run_context is not None:
+            raise PortfolioDefinitionError("Do not pass run_context when resuming; the checkpoint restores it")
+        if cancelled is not None and run_context is not None:
+            raise PortfolioDefinitionError("Pass cancellation through run_context or cancelled, not both")
+
+        resume_checkpoint = None
+        resume_record = None
+        if resume_from_run_id is not None:
+            if self.run_store is None:
+                raise PortfolioDefinitionError("resume requires a configured run_store")
+            if not all(strategy.retry_safe for strategy in self.catalog.all()):
+                unsafe = [s.name for s in self.catalog.all() if not s.retry_safe]
+                raise PortfolioDefinitionError(f"portfolio resume requires every strategy to declare retry_safe=true; unsafe: {unsafe}")
+            resume_checkpoint = self.run_store.get_latest_checkpoint(resume_from_run_id)
+            if resume_checkpoint is None:
+                raise PortfolioDefinitionError(f"no portfolio checkpoint exists for run {resume_from_run_id!r}")
+            resume_record = self.run_store.get(resume_from_run_id)
+            if resume_record is not None and resume_record.get("status") not in {"turn_limit_reached", "cancelled", "budget_exceeded"}:
+                raise PortfolioDefinitionError(f"portfolio run {resume_from_run_id!r} with status {resume_record.get('status')!r} is not resumable")
+            checkpoint_context = resume_checkpoint["checkpoint"].get("run_context")
+            if not isinstance(checkpoint_context, Mapping):
+                raise PortfolioDefinitionError("portfolio checkpoint is missing run_context metadata")
+            saved_budget = ExecutionBudget(**checkpoint_context["budget"])
+            if budget is not None and budget != saved_budget:
+                raise PortfolioDefinitionError("resume budget must match the checkpoint budget")
+            run_context = RunContext.create(
+                budget=saved_budget, cancelled=cancelled, run_id=resume_from_run_id,
+                state_version=checkpoint_context.get("state_version", 0),
+                policy_snapshot=checkpoint_context.get("policy_snapshot", {}),
+                trace_id=checkpoint_context.get("trace_id", ""),
+                parent_run_id=checkpoint_context.get("parent_run_id"),
+                ledger=BudgetLedger.from_mapping(checkpoint_context.get("ledger")),
+                elapsed_before_start_seconds=checkpoint_context.get("elapsed_seconds", 0.0),
+            )
+        elif run_context is None:
             run_context = RunContext.create(
                 budget=budget or ExecutionBudget(), cancelled=cancelled,
                 policy_snapshot={"component": "portfolio", "mode": mode,
                                  "portfolio_id": str(original_state.get("portfolio_id", "algorithm-portfolio"))},
             )
-        elif cancelled is not None:
-            raise PortfolioDefinitionError("Pass cancellation through run_context or cancelled, not both")
         guard = RuntimeGuard(context=run_context)
         guard.preflight(max_turns, {"mode": mode, "initial_state": original_state})
         run_id = run_context.run_id
@@ -400,6 +432,18 @@ class PortfolioController:
         strategies = self.catalog.all()
         if not strategies:
             raise PortfolioDefinitionError("portfolio has no registered strategies")
+
+        portfolio_id = str(original_state.get("portfolio_id", "algorithm-portfolio"))
+        checkpoint_workflow_id = f"portfolio:{portfolio_id}"
+        fingerprint_payload = {
+            "portfolio_id": portfolio_id, "mode": mode, "initial_state": original_state,
+            "on_failure": self.on_failure, "strategies": [strategy.describe() for strategy in strategies],
+        }
+        fingerprint = hashlib.sha256(json.dumps(
+            fingerprint_payload, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")).hexdigest()
+        checkpoint_sequence = None
+        start_turn_index = 0
 
         run_mode = mode
         turns: list[dict[str, Any]] = []
@@ -416,7 +460,47 @@ class PortfolioController:
         stop_reason = "max_turns_reached"
         status = "turn_limit_reached"
 
-        for turn_index in range(max_turns):
+        if resume_checkpoint is not None:
+            if resume_checkpoint["workflow_id"] != checkpoint_workflow_id or resume_checkpoint["workflow_fingerprint"] != fingerprint:
+                raise PortfolioDefinitionError("portfolio definition or strategy catalog differs from the checkpoint")
+            checkpoint = resume_checkpoint["checkpoint"]
+            state = _json_copy(checkpoint["state"], label="checkpoint state")
+            turns = _json_copy(checkpoint["turns"], label="checkpoint turns")
+            run_counts = {name: int(count) for name, count in checkpoint["run_counts"].items()}
+            disabled = set(checkpoint["disabled"])
+            cursor = int(checkpoint["cursor"])
+            family_cursor = int(checkpoint["family_cursor"])
+            family_strategy_cursor = {name: int(value) for name, value in checkpoint["family_strategy_cursor"].items()}
+            queue_cursor = int(checkpoint["queue_cursor"])
+            last_mode = checkpoint.get("last_mode")
+            last_strategy_name = checkpoint.get("last_strategy_name")
+            run_mode = checkpoint.get("run_mode", mode)
+            stop_reason = checkpoint.get("stop_reason", "max_turns_reached")
+            status = checkpoint.get("status", "turn_limit_reached")
+            start_turn_index = int(checkpoint["next_turn_index"])
+            checkpoint_sequence = resume_checkpoint["sequence"]
+            started_at = checkpoint.get("started_at", started_at)
+
+        def persist_checkpoint(next_turn_index: int) -> None:
+            nonlocal checkpoint_sequence
+            if self.run_store is None or not all(strategy.retry_safe for strategy in strategies):
+                return
+            payload = {
+                "kind": "portfolio-turn-checkpoint", "next_turn_index": next_turn_index,
+                "state": state, "turns": turns, "run_counts": run_counts,
+                "disabled": sorted(disabled), "cursor": cursor, "family_cursor": family_cursor,
+                "family_strategy_cursor": family_strategy_cursor, "queue_cursor": queue_cursor,
+                "last_mode": last_mode, "last_strategy_name": last_strategy_name,
+                "run_mode": run_mode, "stop_reason": stop_reason, "status": status,
+                "started_at": started_at, "run_context": run_context.checkpoint_metadata(),
+            }
+            checkpoint_sequence = self.run_store.save_checkpoint(
+                run_id=run_id, workflow_id=checkpoint_workflow_id, workflow_fingerprint=fingerprint,
+                status=status, checkpoint=payload, expected_previous_sequence=checkpoint_sequence,
+            )
+
+        for turn_index in range(start_turn_index, max_turns):
+            persist_checkpoint(turn_index)
             try:
                 guard.checkpoint()
             except ExecutionCancelled as exc:
