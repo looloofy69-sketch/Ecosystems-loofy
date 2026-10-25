@@ -7,6 +7,8 @@ An internal, modular control plane for coordinating decision algorithms and tool
 ## Repository structure
 
     .
+    ├── adapters/
+    │   └── decision-mcp/            # Bounded, read-only MCP server for pure algorithms
     ├── ecosystem/                   # Component registry and maturity records
     ├── docs/
     │   ├── architecture/            # System boundaries, execution contract, adaptive orchestration
@@ -49,6 +51,7 @@ A listed repository is not automatically an integrated component. The MCP adapte
 - [Quality and release gates](docs/operations/quality-gates.md)
 - [Implementation roadmap](docs/roadmap/ROADMAP.md)
 - [Decision module README](modules/decision-infrastructure/README.md)
+- [Decision MCP adapter](adapters/decision-mcp/README.md)
 - [Component registry](ecosystem/registry.json)
 - [Validation report](modules/decision-infrastructure/VALIDATION_REPORT.md)
 
